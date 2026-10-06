@@ -17,16 +17,20 @@
   [hidden]{display:none!important}
   body{margin:0;background:var(--fundo);color:var(--tx);font:15px/1.6 var(--corpo);-webkit-font-smoothing:antialiased}
   .faixa{background:var(--grad);padding:34px 16px 70px;color:#fff;text-align:center}
-  .faixa img{width:72px;display:block;margin:0 auto 14px}
+  .faixa img{width:76px;display:block;margin:0 auto 14px;filter:brightness(0) invert(1)}
   .faixa h1{font-family:var(--ui);font-size:clamp(22px,4vw,28px);margin:0;letter-spacing:-.02em}
   .faixa p{margin:8px auto 0;max-width:560px;opacity:.9}
-  main{max-width:720px;margin:-46px auto 40px;padding:0 16px}
+  main{position:relative;z-index:1;max-width:720px;margin:-46px auto 40px;padding:0 16px}
   .cx{background:var(--branco);border:1px solid var(--linha);border-radius:16px;padding:22px 22px 24px;margin-bottom:14px;box-shadow:0 14px 30px -24px rgba(0,40,97,.35)}
   .cx h2{font-family:var(--ui);font-size:16px;margin:0 0 4px;color:var(--titulo);display:flex;align-items:center;gap:10px}
   .cx h2 .n{width:26px;height:26px;border-radius:99px;background:var(--grad);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
   .dica{font-size:13px;color:var(--tx3);margin:0 0 14px}
   .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media(max-width:620px){.g2{grid-template-columns:1fr}.cx{padding:18px 16px}}
+  @media(max-width:620px){.g2{grid-template-columns:1fr}.cx{padding:18px 16px}
+    .faixa{padding:56px 16px 64px}.faixa img{width:60px}.faixa p{font-size:14px}
+    .tema{top:10px;right:10px}
+    input,select,textarea{font-size:16px}
+    .op{padding:12px}.passos{padding-left:16px}.passos code{overflow-wrap:anywhere}}
   .campo{display:flex;flex-direction:column;gap:5px;min-width:0}
   .campo.l{grid-column:1/-1}
   label,.rot{font-family:var(--ui);font-size:12px;font-weight:600;color:var(--tx2)}
@@ -38,7 +42,9 @@
   .op:has(input:checked){border-color:var(--ciano);background:var(--opsel)}
   .op input{width:18px;height:18px;margin-top:3px;accent-color:#0E7FC4;flex:none}
   .op b{font-family:var(--ui);font-size:14px;display:block;color:var(--titulo)}
-  .op span{font-size:13px;color:var(--tx2)}
+  .op span{font-size:13px;color:var(--tx2);font-weight:400;font-family:var(--corpo)}
+  .passos{font-weight:400;font-family:var(--corpo)}
+  .consent span{font-weight:400;font-family:var(--corpo)}
   .passos{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--tx2)}
   .passos code{background:var(--code);padding:1px 6px;border-radius:5px;font-size:12.5px}
   .aviso{font-size:13px;background:var(--av-bg);border:1px solid var(--av-bd);color:var(--av-tx);border-radius:10px;padding:10px 12px;margin-top:12px}
