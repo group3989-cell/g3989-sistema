@@ -140,13 +140,13 @@
     var hoje = new Date().toISOString().slice(0, 10);
     var abertas = T.filter(function(t){ return !t.feito; }), feitasHoje = T.filter(function(t){ return t.feito && String(t.feito_em || "").slice(0, 10) === hoje; });
     function chave(t){ return (t.feito ? "1" : "0") + (t.prazo || "9999-12-31") + t.prioridade + String(t.ordem).padStart(3, "0"); }
-    var vis = T.filter(function(t){ return !t.feito || est.verFeitas || String(t.feito_em || "").slice(0, 10) === hoje; }).sort(function(a, b){ return chave(a).localeCompare(chave(b)); });
+    var vis = T.filter(function(t){ return !t.feito; }).sort(function(a, b){ return chave(a).localeCompare(chave(b)); });
     var grupos = []; vis.forEach(function(t){ if(grupos.indexOf(t.grupo) < 0) grupos.push(t.grupo); });
     var atrasadas = abertas.filter(function(t){ return t.prazo && t.prazo < hoje; }).length, deHoje = abertas.filter(function(t){ return t.prazo === hoje; }).length;
     var tot = abertas.length + feitasHoje.length, p = tot ? Math.round(100 * feitasHoje.length / tot) : 0;
     var dataTxt = new Date().toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long"});
     $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>Hoje</h2></div><span class="esp"></span>' +
-      '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "Esconder feitas antigas" : "Ver todas as feitas") + '</button><button class="bt p pri" id="bClaudeHoje">Copiar situação para o Claude</button><span id="hMsg" class="msg"></span></div>' +
+      '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "← Voltar para as abertas" : "Histórico de feitas (" + T.filter(function(t){ return t.feito; }).length + ")") + '</button><button class="bt p pri" id="bClaudeHoje">Copiar situação para o Claude</button><span id="hMsg" class="msg"></span></div>' +
       '<div class="conteudo"><div class="cx"><div class="linha"><h3>' + abertas.length + (abertas.length === 1 ? ' tarefa aberta' : ' tarefas abertas') + '</h3><span style="flex:1"></span><span class="msg">' + (atrasadas ? '<b style="color:var(--al)">' + atrasadas + ' atrasadas</b> · ' : "") + deHoje + ' para hoje · ' + feitasHoje.length + ' feitas hoje</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
       '<form class="linha" id="fTarefa" style="margin-top:12px"><input class="busca" id="tTexto" style="margin:0;flex:2 1 240px" placeholder="Nova tarefa" required><input class="busca" id="tGrupo" style="margin:0;flex:1 1 140px" placeholder="Grupo (ex.: Trendyce)" list="gruposT"><datalist id="gruposT">' + grupos.map(function(g){ return '<option value="' + esc(g) + '">'; }).join("") + '</datalist>' +
       '<input class="busca" id="tPrazo" type="date" style="margin:0;width:auto" value="' + hoje + '" title="Prazo"><select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select><button class="bt pri" type="submit">Adicionar</button></form></div>' +
@@ -161,6 +161,7 @@
         }).join("") + '</div>';
       }).join("") : '<div class="vazio">Nenhuma tarefa aberta. Peça ao Claude: "monta as tarefas de hoje".</div>') + '</div>';
     $("bVerFeitas").onclick = function(){ est.verFeitas = !est.verFeitas; telaHoje(); };
+    if(est.verFeitas) return historicoFeitas(T);
     document.querySelectorAll("[data-abre]").forEach(function(b){ b.onclick = function(){ abrirCliente(b.dataset.abre); }; });
     document.querySelectorAll("[data-tf]").forEach(function(b){ b.onclick = function(){
       var t = T.filter(function(x){ return x.id === b.dataset.tf; })[0], novo = !t.feito; b.disabled = true;
@@ -188,6 +189,24 @@
       L.push("", "Lê a tabela de tarefas no Supabase, registra o que precisa e me diz o próximo passo de cada aberta.");
       copiar(L.join("\n"), $("hMsg"), "Copiado. Cole no chat do Claude.");
     };
+  }
+
+  /* histórico: tudo o que foi feito, do mais recente para o mais antigo, agrupado por dia; dá para desfazer */
+  function historicoFeitas(T){
+    var F = T.filter(function(t){ return t.feito; }).sort(function(a, b){ return String(b.feito_em).localeCompare(String(a.feito_em)); }), dias = [];
+    F.forEach(function(t){ var d = String(t.feito_em || "").slice(0, 10); if(dias.indexOf(d) < 0) dias.push(d); });
+    var c = document.querySelector(".conteudo");
+    c.innerHTML = '<div class="cx"><h3>Histórico de feitas</h3><div class="dica">' + F.length + ' tarefas concluídas. Desfazer devolve a tarefa para a lista de abertas.</div></div>' +
+      (F.length ? dias.map(function(d){
+        var L = F.filter(function(t){ return String(t.feito_em || "").slice(0, 10) === d; });
+        return '<div class="bloco"><h4>' + esc(d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"2-digit"}) : "Sem data") + ' <small>' + L.length + '</small></h4>' + L.map(function(t){
+          return '<div class="item feito" style="grid-template-columns:minmax(0,1fr) auto;align-items:center"><div><div class="itx">' + esc(t.texto) + '</div><div class="quando">' + esc(t.grupo) + ' · ' + esc(t.feito_por || "") + ' às ' + new Date(t.feito_em).toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"}) + (t.observacao ? ' · ' + esc(t.observacao) : "") + '</div></div><button class="bt p" data-desfaz="' + t.id + '">Desfazer</button></div>';
+        }).join("") + '</div>';
+      }).join("") : '<div class="vazio">Nada concluído ainda.</div>');
+    c.querySelectorAll("[data-desfaz]").forEach(function(b){ b.onclick = function(){
+      var t = T.filter(function(x){ return x.id === b.dataset.desfaz; })[0]; b.disabled = true;
+      sb.from("tarefas").update({feito:false, feito_em:null, feito_por:null}).eq("id", t.id).then(function(r){ if(r.error){ b.disabled = false; return alertaErro(r.error); } t.feito = false; t.feito_em = null; t.feito_por = null; render(); });
+    }; });
   }
 
   /* ---------- Central de fechamentos (migrada do claude.ai em 06/10/2026) ---------- */
