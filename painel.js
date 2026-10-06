@@ -4,7 +4,7 @@
   var C = window.G3989, sb = window.supabase.createClient(C.supabaseUrl, C.supabaseKey);
   var $ = function(id){ return document.getElementById(id); };
   var app = $("app");
-  var est = { sessao:null, clientes:[], progresso:{}, atual:null, view:"inicio", aba:"checklist", filtro:"todos", busca:"", min:false };
+  var est = { sessao:null, clientes:[], progresso:{}, atual:null, view:"hoje", aba:"checklist", filtro:"todos", busca:"", min:false };
   try { est.min = localStorage.getItem("g3989:lado-min") === "1"; } catch(e){}
   /* tema: segue o sistema até a pessoa escolher; a escolha fica neste navegador */
   function temaAtual(){ var t = null; try { t = localStorage.getItem("g3989:tema"); } catch(e){} return t || (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "claro" : "escuro"); }
@@ -65,8 +65,10 @@
       sb.from("clientes").select("*").order("nome"),
       sb.from("checklist_cliente").select("cliente_id,feito"),
       sb.from("fechamentos").select("*"),
-      sb.from("relatorios_meta").select("*")
+      sb.from("relatorios_meta").select("*"),
+      sb.from("tarefas").select("*").order("prioridade").order("grupo").order("ordem").order("criado_em")
     ]).then(function(r){
+      est.tarefas = r[4].error ? null : (r[4].data || []);
       est.fech = r[2].error ? [] : (r[2].data || []);
       est.metaRel = r[3].error ? [] : (r[3].data || []);
       if(r[0].error){ app.innerHTML = '<div class="vazio">Sem acesso aos dados: ' + esc(erroMsg(r[0].error)) + '. Confira se o seu e-mail está na tabela admins.</div>'; throw r[0].error; }
@@ -84,10 +86,12 @@
     app.innerHTML = '<div class="app' + (est.min ? " min" : "") + '"><aside class="lado">' +
       '<div class="marca"><img src="assets/logo-branca.png" alt="GROUP3989"><div><b>Sistema G3989</b><small>Gestão interna</small></div><button class="rec" id="bMin" title="Minimizar barra" aria-label="Minimizar barra">' + (est.min ? "›" : "‹") + '</button></div>' +
       '<input class="busca" id="busca" placeholder="Buscar cliente" value="' + esc(est.busca) + '">' +
-      '<div class="rot">Clientes · ' + est.clientes.length + '</div><div class="lista">' +
-      '<button class="cli" data-v="inicio" aria-current="' + (est.view === "inicio") + '"><span class="ini">⌂</span><span class="tx"><span class="nm">Início</span></span></button>' +
+      '<div class="lista"><div class="rot" style="padding:6px 8px">Menu</div>' +
+      '<button class="cli" data-v="hoje" aria-current="' + (est.view === "hoje") + '"><span class="ini">✓</span><span class="tx"><span class="nm">Hoje</span><span class="mt">' + (est.tarefas ? est.tarefas.filter(function(t){ return !t.feito; }).length + ' tarefas abertas' : 'Tarefas do dia') + '</span></span></button>' +
       '<button class="cli" data-v="central" aria-current="' + (est.view === "central") + '"><span class="ini">▦</span><span class="tx"><span class="nm">Central de fechamentos</span><span class="mt">Mensal, cartões e Meta</span></span></button>' +
       '<button class="cli" data-v="registro" aria-current="' + (est.view === "registro") + '"><span class="ini">✎</span><span class="tx"><span class="nm">Registro da carteira</span><span class="mt">Ajustes, decisões e alertas</span></span></button>' +
+      '<button class="cli" data-v="inicio" aria-current="' + (est.view === "inicio") + '"><span class="ini">☰</span><span class="tx"><span class="nm">Checklists de entrada</span><span class="mt">Clientes novos</span></span></button>' +
+      '<div class="rot" style="padding:12px 8px 6px">Clientes · ' + est.clientes.length + '</div>' +
       lista.map(function(c){ return '<button class="cli" data-c="' + c.id + '" aria-current="' + (est.atual && est.atual.id === c.id && est.view === "cliente") + '" title="' + esc(c.nome) + '"><span class="ini">' + esc(ini(c.nome)) + '</span><span class="tx"><span class="nm">' + esc(c.nome) + '</span><span class="mt">' + esc(rotStatus(c.status)) + ' · ' + (est.progresso[c.id] ? pct(c.id) + '% do checklist' : esc(rotTipos(c.tipos))) + '</span></span></button>'; }).join("") +
       '<button class="cli" data-v="novo" aria-current="' + (est.view === "novo") + '"><span class="ini">+</span><span class="tx"><span class="nm">Novo cliente</span></span></button></div>' +
       '<div class="ferr"><div class="rot" style="padding:4px 8px">Ferramentas</div>' + C.ferramentas.map(function(f){ return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">' + esc(f.nome) + ' ↗</a>'; }).join("") + '</div>' +
@@ -100,6 +104,7 @@
     app.querySelectorAll("[data-c]").forEach(function(b){ b.onclick = function(){ est.atual = est.clientes.filter(function(c){ return c.id === b.dataset.c; })[0]; est.view = "cliente"; render(); }; });
     app.querySelectorAll("[data-v]").forEach(function(b){ b.onclick = function(){ est.view = b.dataset.v; est.atual = null; render(); }; });
     if(est.view === "novo") return telaNovo();
+    if(est.view === "hoje") return telaHoje();
     if(est.view === "central") return telaCentral();
     if(est.view === "registro") return telaRegistro();
     if(est.view === "cliente" && est.atual) return telaCliente();
@@ -109,7 +114,7 @@
   /* ---------- início ---------- */
   function telaInicio(){
     var n = function(s){ return est.clientes.filter(function(c){ return c.status === s; }).length; };
-    $("main").innerHTML = '<div class="topo"><div><div class="mig">GROUP3989</div><h2>Início</h2></div><span class="esp"></span><button class="bt pri" id="bNovo">+ Novo cliente</button></div><div class="conteudo">' +
+    $("main").innerHTML = '<div class="topo"><div><div class="mig">GROUP3989</div><h2>Checklists de entrada</h2></div><span class="esp"></span><button class="bt pri" id="bNovo">+ Novo cliente</button></div><div class="conteudo">' +
       '<div class="kpis"><div class="kpi"><b>' + n("entrada") + '</b><span>Em entrada</span></div><div class="kpi"><b>' + n("teste") + '</b><span>Em teste</span></div><div class="kpi"><b>' + n("ativo") + '</b><span>Ativos</span></div><div class="kpi"><b>' + n("pausado") + '</b><span>Pausados</span></div></div>' +
       (est.clientes.length ? '<div class="cx"><h3>Checklists de entrada</h3><div class="dica">Progresso de cada cliente no checklist.</div>' + est.clientes.filter(function(c){ return c.status !== "saiu"; }).map(function(c){
         return '<div style="margin-top:12px"><div class="linha"><b style="font-family:var(--ui)">' + esc(c.nome) + '</b><span class="selo ' + c.status + '">' + esc(rotStatus(c.status)) + '</span><span class="esp" style="flex:1"></span><span class="msg">' + pct(c.id) + '%</span></div><div class="prog"><span style="width:' + pct(c.id) + '%"></span></div></div>';
@@ -117,6 +122,58 @@
     $("bNovo").onclick = function(){ est.view = "novo"; render(); };
   }
 
+
+
+  /* ---------- Hoje: tarefas que o Claude cria e o Thiago marca ---------- */
+  function telaHoje(){
+    var T = est.tarefas;
+    if(T === null){ $("main").innerHTML = '<div class="topo"><div><div class="mig">GROUP3989</div><h2>Hoje</h2></div></div><div class="conteudo"><div class="vazio">A tabela de tarefas ainda não existe. Rode o SQL 004 no Supabase.</div></div>'; return; }
+    var hoje = new Date().toISOString().slice(0, 10);
+    var abertas = T.filter(function(t){ return !t.feito; }), feitasHoje = T.filter(function(t){ return t.feito && String(t.feito_em || "").slice(0, 10) === hoje; });
+    var vis = T.filter(function(t){ return !t.feito || est.verFeitas || String(t.feito_em || "").slice(0, 10) === hoje; });
+    var grupos = []; vis.forEach(function(t){ if(grupos.indexOf(t.grupo) < 0) grupos.push(t.grupo); });
+    var tot = abertas.length + feitasHoje.length, p = tot ? Math.round(100 * feitasHoje.length / tot) : 0;
+    var dataTxt = new Date().toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long"});
+    $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>Hoje</h2></div><span class="esp"></span>' +
+      '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "Esconder feitas antigas" : "Ver todas as feitas") + '</button><button class="bt p pri" id="bClaudeHoje">Copiar situação para o Claude</button><span id="hMsg" class="msg"></span></div>' +
+      '<div class="conteudo"><div class="cx"><div class="linha"><h3>' + abertas.length + (abertas.length === 1 ? ' tarefa aberta' : ' tarefas abertas') + '</h3><span style="flex:1"></span><span class="msg">' + feitasHoje.length + ' feitas hoje</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
+      '<form class="linha" id="fTarefa" style="margin-top:12px"><input class="busca" id="tTexto" style="margin:0;flex:2 1 240px" placeholder="Nova tarefa" required><input class="busca" id="tGrupo" style="margin:0;flex:1 1 140px" placeholder="Grupo (ex.: Trendyce)" list="gruposT"><datalist id="gruposT">' + grupos.map(function(g){ return '<option value="' + esc(g) + '">'; }).join("") + '</datalist>' +
+      '<select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select><button class="bt pri" type="submit">Adicionar</button></form></div>' +
+      (vis.length ? grupos.map(function(g){
+        var L = vis.filter(function(t){ return t.grupo === g; }), f = L.filter(function(t){ return t.feito; }).length, urg = L.some(function(t){ return !t.feito && t.prioridade === 1; });
+        return '<div class="bloco"><h4>' + esc(g) + ' <small>' + f + '/' + L.length + '</small>' + (urg ? ' <span class="selo" style="background:var(--al-s);color:var(--al)">urgente</span>' : "") + '</h4>' + L.map(function(t){
+          var cli = t.cliente_id ? cliPorId(t.cliente_id) : null;
+          return '<div class="item' + (t.feito ? " feito" : "") + '"><button class="tick" role="checkbox" aria-checked="' + t.feito + '" aria-label="Marcar como feita" data-tf="' + t.id + '">' + (t.feito ? "✓" : "") + '</button>' +
+            '<div><div class="itx">' + esc(t.texto) + '</div>' + (t.detalhe ? '<div class="quando">' + esc(t.detalhe) + '</div>' : "") + (t.feito && t.feito_em ? '<div class="quando">Feita por ' + esc(t.feito_por || "") + ' em ' + dataBR(t.feito_em) + '</div>' : "") + '</div>' +
+            '<div class="tags">' + (t.prioridade === 1 && !t.feito ? '<span class="selo" style="background:var(--al-s);color:var(--al)">Urgente</span>' : t.prioridade === 3 ? '<span class="selo manual">Sem pressa</span>' : "") + (t.prazo ? '<span class="selo manual">até ' + esc(t.prazo.split("-").reverse().slice(0, 2).join("/")) + '</span>' : "") + (cli ? '<button class="selo api" style="border:0;cursor:pointer" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + '<span class="selo manual">' + esc(t.criado_por) + '</span></div>' +
+            '<input class="obs" data-to="' + t.id + '" value="' + esc(t.observacao || "") + '" placeholder="Observação ou motivo de não ter feito"></div>';
+        }).join("") + '</div>';
+      }).join("") : '<div class="vazio">Nenhuma tarefa aberta. Peça ao Claude: "monta as tarefas de hoje".</div>') + '</div>';
+    $("bVerFeitas").onclick = function(){ est.verFeitas = !est.verFeitas; telaHoje(); };
+    document.querySelectorAll("[data-abre]").forEach(function(b){ b.onclick = function(){ abrirCliente(b.dataset.abre); }; });
+    document.querySelectorAll("[data-tf]").forEach(function(b){ b.onclick = function(){
+      var t = T.filter(function(x){ return x.id === b.dataset.tf; })[0], novo = !t.feito; b.disabled = true;
+      var u = {feito:novo, feito_em:novo ? new Date().toISOString() : null, feito_por:novo ? autor() : null};
+      sb.from("tarefas").update(u).eq("id", t.id).then(function(r){ if(r.error){ b.disabled = false; return alertaErro(r.error); } Object.assign(t, u); render(); });
+    }; });
+    document.querySelectorAll("[data-to]").forEach(function(inp){ inp.onchange = function(){
+      var t = T.filter(function(x){ return x.id === inp.dataset.to; })[0], v = inp.value.trim() || null;
+      sb.from("tarefas").update({observacao:v}).eq("id", t.id).then(function(r){ inp.style.borderColor = r.error ? "var(--al)" : "var(--ok)"; if(!r.error) t.observacao = v; });
+    }; });
+    $("fTarefa").onsubmit = function(ev){
+      ev.preventDefault();
+      var d = {texto:$("tTexto").value.trim(), grupo:$("tGrupo").value.trim() || "Geral", prioridade:+$("tPri").value, criado_por:autor()};
+      sb.from("tarefas").insert(d).select().single().then(function(r){ if(r.error) return alertaErro(r.error); T.push(r.data); render(); });
+    };
+    $("bClaudeHoje").onclick = function(){
+      var feitas = T.filter(function(t){ return t.feito && String(t.feito_em || "").slice(0, 10) === hoje; }), L = ["Claude, situação das tarefas de hoje no Sistema G3989:", "", "FEITAS HOJE (" + feitas.length + "):"];
+      feitas.forEach(function(t){ L.push("- " + t.texto + (t.observacao ? " (obs.: " + t.observacao + ")" : "")); });
+      L.push("", "ABERTAS (" + abertas.length + "):");
+      abertas.forEach(function(t){ L.push("- [" + t.grupo + "] " + t.texto + (t.observacao ? " | motivo: " + t.observacao : "")); });
+      L.push("", "Lê a tabela de tarefas no Supabase, registra o que precisa e me diz o próximo passo de cada aberta.");
+      copiar(L.join("\n"), $("hMsg"), "Copiado. Cole no chat do Claude.");
+    };
+  }
 
   /* ---------- Central de fechamentos (migrada do claude.ai em 06/10/2026) ---------- */
   var MESES_PT = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
