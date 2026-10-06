@@ -30,6 +30,8 @@
   function dataBR(iso){ if(!iso) return ""; var d = new Date(iso); return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"}); }
   function autor(){ var e = est.sessao && est.sessao.user && est.sessao.user.email; return e === C.email ? "Thiago" : (e || "Equipe"); }
   function linkForm(c){ var base = location.origin + location.pathname.replace(/index\.html$/, ""); if(!/\/$/.test(base)) base += "/"; return base + "cadastro/?t=" + c.token_formulario; }
+  /* mensagem pronta para mandar o formulário ao cliente pelo WhatsApp */
+  function msgForm(c){ return "Olá" + (c.responsavel ? ", " + c.responsavel.split(" ")[0] : "") + "! Para começarmos com segurança, preencha o cadastro da " + c.nome + " neste link. Leva uns 5 minutos e não pede nenhuma senha: " + linkForm(c); }
   function copiar(txt, el, ok){
     function fim(b){ if(el){ el.textContent = b ? ok : "Não deu para copiar"; el.className = "msg " + (b ? "ok" : "erro"); setTimeout(function(){ el.textContent = ""; }, 2500); } }
     if(navigator.clipboard) navigator.clipboard.writeText(txt).then(function(){ fim(true); }, function(){ fim(false); }); else fim(false);
@@ -160,7 +162,7 @@
           var L = blocos[b], f = L.filter(function(x){ return x.feito; }).length;
           return '<div class="bloco"><h4>' + esc(b) + ' <small>' + f + '/' + L.length + '</small></h4>' + L.map(function(x){
             return '<div class="item' + (x.feito ? " feito" : "") + '"><button class="tick" role="checkbox" aria-checked="' + x.feito + '" aria-label="Marcar como feito" data-t="' + x.id + '">' + (x.feito ? "✓" : "") + '</button>' +
-              '<div><div class="itx">' + esc(x.item) + '</div>' + (x.feito && x.feito_em ? '<div class="quando">Feito por ' + esc(x.feito_por || "") + ' em ' + dataBR(x.feito_em) + '</div>' : "") + '</div>' +
+              '<div><div class="itx">' + esc(x.item) + '</div>' + (/link do formul/i.test(x.item) ? '<div class="linha" style="margin-top:6px"><button class="bt p" data-copia-link="1">Copiar link</button><a class="bt p" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(msgForm(c)) + '">Enviar no WhatsApp</a><span class="msg" id="lkMsg"></span></div>' : "") + (x.feito && x.feito_em ? '<div class="quando">Feito por ' + esc(x.feito_por || "") + ' em ' + dataBR(x.feito_em) + '</div>' : "") + '</div>' +
               '<div class="tags"><span class="selo ' + (x.execucao === "api" ? "api" : "manual") + '">' + (x.execucao === "api" ? "API" : "Manual") + '</span><span class="selo manual">' + esc(x.quem) + '</span></div>' +
               '<input class="obs" data-o="' + x.id + '" value="' + esc(x.observacao || "") + '" placeholder="Observação (o motivo, se não fizer)"></div>';
           }).join("") + '</div>';
@@ -173,6 +175,7 @@
           var pr = est.progresso[c.id] = est.progresso[c.id] || {f:0, t:itens.length}; pr.f += novo ? 1 : -1; abaChecklist(c);
         });
       }; });
+      corpo.querySelectorAll("[data-copia-link]").forEach(function(b){ b.onclick = function(){ copiar(linkForm(c), $("lkMsg"), "Link copiado"); }; });
       corpo.querySelectorAll("[data-o]").forEach(function(inp){ inp.onchange = function(){ sb.from("checklist_cliente").update({observacao:inp.value.trim() || null}).eq("id", inp.dataset.o).then(function(u){ inp.style.borderColor = u.error ? "var(--al)" : "var(--ok)"; }); }; });
       $("bClaude").onclick = function(){
         var t = ["Claude, executa no Sistema G3989 o que é seu no checklist de entrada do cliente " + c.nome + " (id " + c.id + "):"].concat(pendApi.map(function(x){ return "- " + x.bloco + ": " + x.item + (x.observacao ? " (obs.: " + x.observacao + ")" : ""); }));
