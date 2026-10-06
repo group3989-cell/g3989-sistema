@@ -13,7 +13,7 @@
   function rotTema(){ return temaAtual() === "claro" ? "☾ Escuro" : "☀ Claro"; }
   aplicarTema();
 
-  var TIPOS = [["ecommerce","E-commerce"],["mensagem","Mensagem"],["lead","Lead de site"],["avulso","Avulso"]];
+  var TIPOS = [["ecommerce","E-commerce"],["mensagem","Mensagem"],["lead","Lead de site"],["servicos","Serviços"],["avulso","Avulso"]];
   var STATUS = [["entrada","Entrada"],["teste","Teste 30 dias"],["ativo","Ativo"],["pausado","Pausado"],["saiu","Saiu"]];
   var IDS = [["bm","BM"],["conta_anuncio","Conta de anúncio (act_)"],["pixel","Pixel"],["pagina","Página do Facebook"],["instagram","Instagram"],["waba","WABA (WhatsApp API)"],["ga4","Propriedade GA4"],["loja_url","URL da loja"]];
   var ROT_CAD = {responsavel:"Responsável", empresa:"Nome da empresa", razao_social:"Razão social", cnpj:"CNPJ", endereco:"Endereço", telefone:"Telefone", email:"E-mail", site:"Site", instagram:"Instagram", segmento:"Segmento", plataforma_loja:"Plataforma da loja", erp:"Sistema de gestão (ERP)", crm:"CRM", whatsapp:"WhatsApp", time_tamanho:"Tamanho do time", time_responsaveis:"Responsáveis", horario:"Horário de atendimento", registro_vendas:"Como registra as vendas", faturamento_6m:"Faturamento dos últimos 6 meses", ticket_medio:"Ticket médio", ja_anuncia:"Já anuncia", investimento:"Investimento mensal em anúncios", acesso:"Forma de acesso", objetivo:"Objetivo principal", observacoes:"Observações", consentimento:"Consentimento LGPD"};
@@ -63,8 +63,12 @@
   function carregar(){
     return Promise.all([
       sb.from("clientes").select("*").order("nome"),
-      sb.from("checklist_cliente").select("cliente_id,feito")
+      sb.from("checklist_cliente").select("cliente_id,feito"),
+      sb.from("fechamentos").select("*"),
+      sb.from("relatorios_meta").select("*")
     ]).then(function(r){
+      est.fech = r[2].error ? [] : (r[2].data || []);
+      est.metaRel = r[3].error ? [] : (r[3].data || []);
       if(r[0].error){ app.innerHTML = '<div class="vazio">Sem acesso aos dados: ' + esc(erroMsg(r[0].error)) + '. Confira se o seu e-mail está na tabela admins.</div>'; throw r[0].error; }
       est.clientes = r[0].data || [];
       est.progresso = {};
@@ -82,7 +86,9 @@
       '<input class="busca" id="busca" placeholder="Buscar cliente" value="' + esc(est.busca) + '">' +
       '<div class="rot">Clientes · ' + est.clientes.length + '</div><div class="lista">' +
       '<button class="cli" data-v="inicio" aria-current="' + (est.view === "inicio") + '"><span class="ini">⌂</span><span class="tx"><span class="nm">Início</span></span></button>' +
-      lista.map(function(c){ return '<button class="cli" data-c="' + c.id + '" aria-current="' + (est.atual && est.atual.id === c.id && est.view === "cliente") + '" title="' + esc(c.nome) + '"><span class="ini">' + esc(ini(c.nome)) + '</span><span class="tx"><span class="nm">' + esc(c.nome) + '</span><span class="mt">' + esc(rotStatus(c.status)) + ' · ' + pct(c.id) + '% do checklist</span></span></button>'; }).join("") +
+      '<button class="cli" data-v="central" aria-current="' + (est.view === "central") + '"><span class="ini">▦</span><span class="tx"><span class="nm">Central de fechamentos</span><span class="mt">Mensal, cartões e Meta</span></span></button>' +
+      '<button class="cli" data-v="registro" aria-current="' + (est.view === "registro") + '"><span class="ini">✎</span><span class="tx"><span class="nm">Registro da carteira</span><span class="mt">Ajustes, decisões e alertas</span></span></button>' +
+      lista.map(function(c){ return '<button class="cli" data-c="' + c.id + '" aria-current="' + (est.atual && est.atual.id === c.id && est.view === "cliente") + '" title="' + esc(c.nome) + '"><span class="ini">' + esc(ini(c.nome)) + '</span><span class="tx"><span class="nm">' + esc(c.nome) + '</span><span class="mt">' + esc(rotStatus(c.status)) + ' · ' + (est.progresso[c.id] ? pct(c.id) + '% do checklist' : esc(rotTipos(c.tipos))) + '</span></span></button>'; }).join("") +
       '<button class="cli" data-v="novo" aria-current="' + (est.view === "novo") + '"><span class="ini">+</span><span class="tx"><span class="nm">Novo cliente</span></span></button></div>' +
       '<div class="ferr"><div class="rot" style="padding:4px 8px">Ferramentas</div>' + C.ferramentas.map(function(f){ return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">' + esc(f.nome) + ' ↗</a>'; }).join("") + '</div>' +
       '<div class="pe"><button class="sair" id="bSair">⎋ <span>Sair (' + esc(autor()) + ')</span></button><span style="flex:1"></span><button class="tema" id="bTema" title="Trocar tema claro ou escuro">' + rotTema() + '</button></div></aside>' +
@@ -94,6 +100,8 @@
     app.querySelectorAll("[data-c]").forEach(function(b){ b.onclick = function(){ est.atual = est.clientes.filter(function(c){ return c.id === b.dataset.c; })[0]; est.view = "cliente"; render(); }; });
     app.querySelectorAll("[data-v]").forEach(function(b){ b.onclick = function(){ est.view = b.dataset.v; est.atual = null; render(); }; });
     if(est.view === "novo") return telaNovo();
+    if(est.view === "central") return telaCentral();
+    if(est.view === "registro") return telaRegistro();
     if(est.view === "cliente" && est.atual) return telaCliente();
     telaInicio();
   }
@@ -107,6 +115,85 @@
         return '<div style="margin-top:12px"><div class="linha"><b style="font-family:var(--ui)">' + esc(c.nome) + '</b><span class="selo ' + c.status + '">' + esc(rotStatus(c.status)) + '</span><span class="esp" style="flex:1"></span><span class="msg">' + pct(c.id) + '%</span></div><div class="prog"><span style="width:' + pct(c.id) + '%"></span></div></div>';
       }).join("") + '</div>' : '<div class="vazio"><h3 style="color:var(--tx)">Nenhum cliente ainda</h3><p>Cadastre o primeiro cliente para gerar o checklist de entrada e o link do formulário.</p></div>') + '</div>';
     $("bNovo").onclick = function(){ est.view = "novo"; render(); };
+  }
+
+
+  /* ---------- Central de fechamentos (migrada do claude.ai em 06/10/2026) ---------- */
+  var MESES_PT = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  var ST_F = {ok:"Pronto", parcial:"Parcial", pend:"Pendente"};
+  var GRUPO = {ecommerce:"E-commerce", mensagem:"Mensagens", lead:"Leads", servicos:"Serviços", avulso:"Avulso"};
+  function mesPassado(){ var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+  function rotMes(k){ var n = MESES_PT[+k.split("-")[1] - 1]; return n.charAt(0).toUpperCase() + n.slice(1) + " " + k.split("-")[0]; }
+  function nomeMes(k){ return MESES_PT[+k.split("-")[1] - 1]; }
+  function grupoDe(c){ var t = (c.tipos || [])[0]; return GRUPO[t] || "Outros"; }
+  function cliPorId(id){ return est.clientes.filter(function(c){ return c.id === id; })[0]; }
+  function abrirCliente(id, aba){ est.atual = cliPorId(id); est.view = "cliente"; if(aba) est.aba = aba; render(); }
+
+  function telaCentral(){
+    var mp = mesPassado(), meses = {};
+    (est.fech || []).forEach(function(f){ meses[f.mes] = 1; }); meses[mp] = 1;
+    var ks = Object.keys(meses).sort().reverse();
+    if(!est.mesC || !meses[est.mesC]) est.mesC = (est.fech || []).some(function(f){ return f.mes === mp; }) ? mp : ks[0];
+    var doMes = (est.fech || []).filter(function(f){ return f.mes === est.mesC; }).map(function(f){ return Object.assign({c:cliPorId(f.cliente_id)}, f); }).filter(function(f){ return f.c; });
+    var grupos = ["Todos"].concat(Object.keys(GRUPO).map(function(k){ return GRUPO[k]; }).filter(function(g){ return doMes.some(function(f){ return grupoDe(f.c) === g; }); }));
+    est.grupoC = grupos.indexOf(est.grupoC) >= 0 ? est.grupoC : "Todos";
+    var q = (est.buscaC || "").toLowerCase();
+    var vis = doMes.filter(function(f){ return (est.grupoC === "Todos" || grupoDe(f.c) === est.grupoC) && (!q || (f.c.nome + " " + (f.c.descricao || "")).toLowerCase().indexOf(q) >= 0); })
+      .sort(function(a, b){ return a.c.nome.localeCompare(b.c.nome, "pt-BR"); });
+    var n = function(fn){ return doMes.filter(fn).length; };
+    var meta = (est.metaRel || []).filter(function(x){ return x.mes === mp; })[0], antigos = (est.metaRel || []).filter(function(x){ return x.mes !== mp; }).sort(function(a, b){ return b.mes.localeCompare(a.mes); });
+    var vir = C.ferramentas.filter(function(f){ return /Virada/.test(f.nome); })[0], sem = C.ferramentas.filter(function(f){ return /Semanal/.test(f.nome); })[0];
+    $("main").innerHTML = '<div class="topo"><div><div class="mig">GROUP3989 · Central</div><h2>Fechamentos de ' + esc(nomeMes(est.mesC)) + '</h2></div><span class="esp"></span>' +
+      '<select class="busca" id="cMes" style="margin:0;width:auto">' + ks.map(function(k){ return '<option value="' + k + '"' + (k === est.mesC ? " selected" : "") + '>' + esc(rotMes(k)) + (k === mp ? " · mês passado" : "") + '</option>'; }).join("") + '</select></div>' +
+      '<div class="conteudo"><div class="kpis"><div class="kpi"><b>' + n(function(f){ return f.url; }) + '</b><span>Cartões publicados</span></div><div class="kpi"><b>' + n(function(f){ return f.status === "parcial"; }) + '</b><span>Parciais</span></div><div class="kpi"><b>' + n(function(f){ return f.status === "pend"; }) + '</b><span>Pendentes</span></div><div class="kpi"><b>' + n(function(f){ return f.enviado; }) + ' de ' + doMes.length + '</b><span>Enviados ao cliente</span></div></div>' +
+      '<div class="cx"><div class="linha"><input class="busca" id="cBusca" style="margin:0;flex:1 1 220px" placeholder="Buscar cliente" value="' + esc(est.buscaC || "") + '"><div class="opcoes">' + grupos.map(function(g){ return '<label class="op"><input type="radio" name="grupoC" value="' + esc(g) + '"' + (g === est.grupoC ? " checked" : "") + '><span>' + esc(g) + '</span></label>'; }).join("") + '</div></div>' +
+      (doMes.length ? vis.map(function(f){
+        return '<div class="item" style="grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) auto;align-items:center;margin-top:8px;border-left:4px solid ' + (f.status === "ok" ? "var(--ok)" : f.status === "parcial" ? "var(--av)" : "var(--linha2)") + '">' +
+          '<div><button class="bt p" style="border:0;background:none;padding:0;font-weight:600;font-family:var(--ui);font-size:14px" data-abre="' + f.c.id + '">' + esc(f.c.nome) + '</button><div class="quando">' + esc(f.c.descricao || grupoDe(f.c)) + '</div></div>' +
+          '<div><b style="font-family:var(--ui);font-size:17px">' + esc(f.destaque || "") + '</b><div class="quando">' + esc(f.rotulo || "") + '</div></div>' +
+          '<div class="linha" style="justify-content:flex-end"><span class="selo ' + (f.status === "ok" ? "ativo" : f.status === "parcial" ? "teste" : "pausado") + '">' + ST_F[f.status] + '</span>' +
+          (f.url ? '<label class="op"><input type="checkbox" data-env="' + f.id + '"' + (f.enviado ? " checked" : "") + '><span>Enviado</span></label><a class="bt p pri" href="' + esc(f.url) + '" target="_blank" rel="noopener">Abrir cartão</a>' : '<span class="quando">Sem cartão</span>') + '</div>' +
+          (f.nota ? '<div class="quando" style="grid-column:1/-1;border-top:1px dashed var(--linha);padding-top:6px">' + esc(f.nota) + '</div>' : "") + '</div>';
+      }).join("") || '<div class="dica" style="margin-top:12px">Nenhum cliente com esse filtro.</div>' : '<div class="vazio">Os fechamentos de ' + esc(nomeMes(est.mesC)) + ' ainda não foram montados. Peça ao Claude: "monta os fechamentos de ' + esc(nomeMes(est.mesC)) + '".</div>') + '</div>' +
+      '<div class="cx"><h3>Ferramentas</h3><div class="g3" style="margin-top:12px">' +
+        (vir ? '<a class="kpi" style="text-decoration:none;color:inherit" href="' + esc(vir.url) + '" target="_blank" rel="noopener"><b style="font-size:15px">Virada de Mês ↗</b><span>Planejamento mensal por cliente</span></a>' : "") +
+        (sem ? '<a class="kpi" style="text-decoration:none;color:inherit" href="' + esc(sem.url) + '" target="_blank" rel="noopener"><b style="font-size:15px">Relatório semanal ↗</b><span>Semana a semana por cliente</span></a>' : "") +
+        (meta ? '<a class="kpi" style="text-decoration:none;color:inherit" href="' + esc(meta.url) + '" target="_blank" rel="noopener"><b style="font-size:15px">Relatório Meta de ' + esc(nomeMes(mp)) + ' ↗</b><span>Todas as contas da BM1</span></a>' : '<div class="kpi" style="border-style:dashed"><b style="font-size:15px">Relatório Meta de ' + esc(nomeMes(mp)) + '</b><span>Ainda não montado. Peça ao Claude.</span></div>') +
+      '</div>' + (antigos.length ? '<div class="dica" style="margin-top:10px">Relatórios Meta anteriores: ' + antigos.map(function(x){ return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener" style="color:var(--ciano)">' + esc(rotMes(x.mes)) + '</a>'; }).join(" · ") + '</div>' : "") + '</div>' +
+      '<div class="dica">Regra dos cartões: investimento é o gasto da Meta mais 13% (Kelly 8%). Custo de cada resultado sempre pela campanha dele.</div></div>';
+    $("cMes").onchange = function(){ est.mesC = this.value; telaCentral(); };
+    $("cBusca").oninput = function(){ est.buscaC = this.value; var p = this.selectionStart; telaCentral(); var b = $("cBusca"); b.focus(); b.setSelectionRange(p, p); };
+    document.querySelectorAll('input[name="grupoC"]').forEach(function(x){ x.onchange = function(){ est.grupoC = x.value; telaCentral(); }; });
+    document.querySelectorAll("[data-abre]").forEach(function(b){ b.onclick = function(){ abrirCliente(b.dataset.abre, "fechamentos"); }; });
+    document.querySelectorAll("[data-env]").forEach(function(x){ x.onchange = function(){
+      var v = x.checked, f = (est.fech || []).filter(function(y){ return y.id === x.dataset.env; })[0];
+      sb.from("fechamentos").update({enviado:v, enviado_em:v ? new Date().toISOString() : null}).eq("id", x.dataset.env).then(function(u){ if(u.error){ x.checked = !v; return alertaErro(u.error); } if(f) f.enviado = v; telaCentral(); });
+    }; });
+  }
+
+  function abaFechamentos(c){
+    var L = (est.fech || []).filter(function(f){ return f.cliente_id === c.id; }).sort(function(a, b){ return b.mes.localeCompare(a.mes); });
+    $("corpo").innerHTML = '<div class="cx"><h3>Fechamentos mensais</h3><div class="dica">Um cartão por mês. O semanal deste cliente fica no Relatório Semanal.</div>' +
+      (L.length ? L.map(function(f){ return '<div class="item" style="grid-template-columns:minmax(0,1fr) auto;align-items:center"><div><b style="font-family:var(--ui);font-size:16px">' + esc(f.destaque || "") + '</b> <span class="quando">' + esc(f.rotulo || "") + '</span><div class="quando">' + esc(rotMes(f.mes)) + ' · ' + ST_F[f.status] + (f.enviado ? " · enviado" : "") + '</div>' + (f.nota ? '<div class="quando">' + esc(f.nota) + '</div>' : "") + '</div>' +
+        (f.url ? '<a class="bt p pri" href="' + esc(f.url) + '" target="_blank" rel="noopener">Abrir cartão</a>' : '<span class="quando">Sem cartão</span>') + '</div>'; }).join("") : '<div class="dica">Ainda sem fechamento mensal.</div>') + '</div>';
+  }
+
+  function telaRegistro(){
+    $("main").innerHTML = '<div class="topo"><div><div class="mig">Central</div><h2>Registro da carteira</h2></div></div><div class="conteudo" id="corpoReg"><div class="carregando">Carregando…</div></div>';
+    sb.from("registro").select("*").order("criado_em", {ascending:false}).limit(500).then(function(r){
+      var L = r.data || [], TIP = [["todos","Todos"],["nota","Nota"],["ajuste","Ajuste"],["decisao","Decisão"],["resultado","Resultado"],["alerta","Alerta"],["pendencia","Pendência"]];
+      est.tipoR = est.tipoR || "todos";
+      function pinta(){
+        var q = (est.buscaR || "").toLowerCase();
+        var vis = L.filter(function(x){ var c = cliPorId(x.cliente_id); return (est.tipoR === "todos" || x.tipo === est.tipoR) && (!q || (x.texto + " " + (c ? c.nome : "")).toLowerCase().indexOf(q) >= 0); });
+        $("corpoReg").innerHTML = '<div class="cx"><div class="linha"><input class="busca" id="rBusca" style="margin:0;flex:1 1 220px" placeholder="Buscar no registro" value="' + esc(est.buscaR || "") + '"><div class="opcoes">' + TIP.map(function(t){ return '<label class="op"><input type="radio" name="tipoR" value="' + t[0] + '"' + (est.tipoR === t[0] ? " checked" : "") + '><span>' + t[1] + '</span></label>'; }).join("") + '</div></div>' +
+          (vis.length ? vis.map(function(x){ var c = cliPorId(x.cliente_id); return '<div class="reg ' + x.tipo + '"><div class="cab"><b>' + esc(x.autor) + '</b><span>' + esc(x.tipo) + '</span><span>' + dataBR(x.criado_em) + '</span>' + (c ? '<button class="bt p" style="padding:0 6px;border:0;background:none;color:var(--ciano)" data-abre="' + c.id + '">' + esc(c.nome) + '</button>' : "") + '</div>' + esc(x.texto) + '</div>'; }).join("") : '<div class="dica" style="margin-top:12px">Nada encontrado.</div>') + '</div>';
+        $("rBusca").oninput = function(){ est.buscaR = this.value; var p = this.selectionStart; pinta(); var b = $("rBusca"); b.focus(); b.setSelectionRange(p, p); };
+        document.querySelectorAll('input[name="tipoR"]').forEach(function(x){ x.onchange = function(){ est.tipoR = x.value; pinta(); }; });
+        document.querySelectorAll("[data-abre]").forEach(function(b){ b.onclick = function(){ abrirCliente(b.dataset.abre, "registro"); }; });
+      }
+      pinta();
+    });
   }
 
   /* ---------- novo cliente ---------- */
@@ -139,11 +226,11 @@
 
   /* ---------- cliente ---------- */
   function telaCliente(){
-    var c = est.atual, ABAS = [["checklist","Checklist"],["ficha","Ficha e IDs"],["cadastro","Formulário"],["registro","Registro"]];
+    var c = est.atual, ABAS = [["checklist","Checklist"],["fechamentos","Fechamentos"],["ficha","Ficha e IDs"],["cadastro","Formulário"],["registro","Registro"]];
     $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(rotTipos(c.tipos) || "Cliente") + '</div><h2>' + esc(c.nome) + ' <span class="selo ' + c.status + '">' + esc(rotStatus(c.status)) + '</span></h2></div><span class="esp"></span>' +
       '<div class="abas">' + ABAS.map(function(a){ return '<button class="aba" data-a="' + a[0] + '" aria-selected="' + (est.aba === a[0]) + '">' + a[1] + '</button>'; }).join("") + '</div></div><div class="conteudo" id="corpo"><div class="carregando">Carregando…</div></div>';
     document.querySelectorAll("[data-a]").forEach(function(b){ b.onclick = function(){ est.aba = b.dataset.a; telaCliente(); }; });
-    ({checklist:abaChecklist, ficha:abaFicha, cadastro:abaCadastro, registro:abaRegistro})[est.aba](c);
+    ({checklist:abaChecklist, fechamentos:abaFechamentos, ficha:abaFicha, cadastro:abaCadastro, registro:abaRegistro})[est.aba](c);
   }
 
   function abaChecklist(c){
@@ -270,7 +357,7 @@
     sb.from("registro").select("*").eq("cliente_id", c.id).order("criado_em", {ascending:false}).limit(200).then(function(r){
       var L = r.data || [];
       $("corpo").innerHTML = '<form class="cx" id="fReg"><h3>Novo registro</h3><div class="dica">Decisão, ajuste, alerta ou pendência. Eu leio isto antes de mexer no cliente e gravo aqui o que fiz.</div>' +
-        '<div class="g2" style="grid-template-columns:180px 1fr"><div class="campo"><label for="rTipo">Tipo</label><select id="rTipo"><option value="nota">Nota</option><option value="decisao">Decisão</option><option value="ajuste">Ajuste</option><option value="alerta">Alerta</option><option value="pendencia">Pendência</option></select></div>' +
+        '<div class="g2" style="grid-template-columns:180px 1fr"><div class="campo"><label for="rTipo">Tipo</label><select id="rTipo"><option value="nota">Nota</option><option value="decisao">Decisão</option><option value="ajuste">Ajuste</option><option value="alerta">Alerta</option><option value="pendencia">Pendência</option><option value="resultado">Resultado</option></select></div>' +
         '<div class="campo"><label for="rTexto">Texto</label><textarea id="rTexto" required></textarea></div></div><div class="linha" style="margin-top:10px"><button class="bt pri" type="submit">Registrar</button><span id="rMsg" class="msg"></span></div></form>' +
         '<div class="cx"><h3>Histórico</h3>' + (L.length ? L.map(function(x){ return '<div class="reg ' + x.tipo + '"><div class="cab"><b>' + esc(x.autor) + '</b><span>' + esc(x.tipo) + '</span><span>' + dataBR(x.criado_em) + '</span></div>' + esc(x.texto) + '</div>'; }).join("") : '<div class="dica">Nada registrado ainda.</div>') + '</div>';
       $("fReg").onsubmit = function(ev){
