@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Cadastro de Cliente · GROUP3989</title>
+<link rel="icon" href="../assets/logo-azul.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap">
+<style>
+  :root{--navy:#002861;--ciano:#13BBF1;--tx:#0B1F3A;--tx2:#3D5576;--tx3:#6A7F99;--linha:#DCE6F2;--fundo:#F4F8FC;--branco:#fff;--erro:#C24152;--ok:#1F9D6B;--grad:linear-gradient(120deg,#002861 0%,#0E7FC4 55%,#13BBF1 100%);--campo:#FBFDFF;--opsel:#F0FAFE;--code:#EAF3FB;--av-bg:#FFF8EC;--av-bd:#F4D9A8;--av-tx:#7A5410;--titulo:#002861;color-scheme:light;--ui:"Sora",system-ui,sans-serif;--corpo:"Manrope",system-ui,sans-serif}
+  :root[data-tema="escuro"]{--tx:#EAF4FF;--tx2:#A8BDD6;--tx3:#7E95B2;--linha:rgba(120,185,255,.18);--fundo:#040B16;--branco:#0A1A33;--campo:#061327;--opsel:rgba(19,187,241,.12);--code:rgba(19,187,241,.15);--av-bg:rgba(242,180,90,.12);--av-bd:rgba(242,180,90,.35);--av-tx:#F7D4A0;--titulo:#EAF4FF;--erro:#FF7D88;color-scheme:dark}
+  .tema{position:absolute;top:14px;right:14px;width:auto;padding:6px 11px;font-size:12px;font-weight:500;border:1px solid rgba(255,255,255,.4);border-radius:8px;background:rgba(255,255,255,.12);color:#fff;box-shadow:none}
+  .faixa{position:relative}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--fundo);color:var(--tx);font:15px/1.6 var(--corpo);-webkit-font-smoothing:antialiased}
+  .faixa{background:var(--grad);padding:34px 16px 70px;color:#fff;text-align:center}
+  .faixa img{width:72px;display:block;margin:0 auto 14px}
+  .faixa h1{font-family:var(--ui);font-size:clamp(22px,4vw,28px);margin:0;letter-spacing:-.02em}
+  .faixa p{margin:8px auto 0;max-width:560px;opacity:.9}
+  main{max-width:720px;margin:-46px auto 40px;padding:0 16px}
+  .cx{background:var(--branco);border:1px solid var(--linha);border-radius:16px;padding:22px 22px 24px;margin-bottom:14px;box-shadow:0 14px 30px -24px rgba(0,40,97,.35)}
+  .cx h2{font-family:var(--ui);font-size:16px;margin:0 0 4px;color:var(--titulo);display:flex;align-items:center;gap:10px}
+  .cx h2 .n{width:26px;height:26px;border-radius:99px;background:var(--grad);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+  .dica{font-size:13px;color:var(--tx3);margin:0 0 14px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:620px){.g2{grid-template-columns:1fr}.cx{padding:18px 16px}}
+  .campo{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .campo.l{grid-column:1/-1}
+  label,.rot{font-family:var(--ui);font-size:12px;font-weight:600;color:var(--tx2)}
+  input,select,textarea{font:inherit;color:var(--tx);width:100%;padding:11px 12px;border:1px solid var(--linha);border-radius:10px;background:var(--campo)}
+  textarea{min-height:80px;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:0;border-color:var(--ciano);box-shadow:0 0 0 3px rgba(19,187,241,.18)}
+  .ops{display:grid;gap:10px}
+  .op{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1.5px solid var(--linha);border-radius:12px;cursor:pointer;background:var(--campo)}
+  .op:has(input:checked){border-color:var(--ciano);background:var(--opsel)}
+  .op input{width:18px;height:18px;margin-top:3px;accent-color:#0E7FC4;flex:none}
+  .op b{font-family:var(--ui);font-size:14px;display:block;color:var(--titulo)}
+  .op span{font-size:13px;color:var(--tx2)}
+  .passos{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--tx2)}
+  .passos code{background:var(--code);padding:1px 6px;border-radius:5px;font-size:12.5px}
+  .aviso{font-size:13px;background:var(--av-bg);border:1px solid var(--av-bd);color:var(--av-tx);border-radius:10px;padding:10px 12px;margin-top:12px}
+  .consent{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;color:var(--tx2)}
+  .consent input{width:18px;height:18px;margin-top:3px;accent-color:#0E7FC4;flex:none}
+  button{font-family:var(--ui);font-size:15px;font-weight:600;width:100%;padding:14px;border:0;border-radius:12px;background:var(--grad);color:#fff;cursor:pointer;box-shadow:0 14px 26px -14px rgba(14,127,196,.8)}
+  button:disabled{opacity:.6;cursor:wait}
+  .msg{text-align:center;margin-top:10px;font-size:14px}
+  .msg.erro{color:var(--erro)}
+  .fim{text-align:center;padding:40px 22px}
+  .fim .ck{width:56px;height:56px;border-radius:99px;background:var(--ok);color:#fff;display:grid;place-items:center;font-size:28px;margin:0 auto 14px}
+  .fim h2{justify-content:center}
+  footer{text-align:center;font-size:12px;color:var(--tx3);padding:0 16px 30px}
+</style>
+</head>
+<body>
+<div class="faixa"><button type="button" class="tema" id="bTema"></button><img src="../assets/logo-branca.png" alt="GROUP3989"><h1 id="titulo">Cadastro de Cliente</h1><p>Com estes dados configuramos suas contas de forma segura e começamos o trabalho com o pé direito. Leva uns 5 minutos.</p></div>
+<main>
+  <div id="invalido" class="cx fim" hidden><h2>Link inválido ou expirado</h2><p class="dica">Peça um novo link para a equipe GROUP3989.</p></div>
+  <div id="pronto" class="cx fim" hidden><div class="ck">✓</div><h2>Recebemos seu cadastro</h2><p class="dica">Obrigado! A equipe GROUP3989 vai conferir os dados e seguir com a configuração. Qualquer dúvida, fale com a gente pelo WhatsApp.</p></div>
+
+  <form id="form" hidden>
+    <div class="cx"><h2><span class="n">1</span>Dados da empresa</h2><p class="dica">Como aparecem no CNPJ.</p>
+      <div class="g2">
+        <div class="campo"><label for="responsavel">Nome da proprietária(o)</label><input id="responsavel" required autocomplete="name"></div>
+        <div class="campo"><label for="empresa">Nome da empresa (marca)</label><input id="empresa" required></div>
+        <div class="campo"><label for="razao_social">Razão social</label><input id="razao_social"></div>
+        <div class="campo"><label for="cnpj">CNPJ</label><input id="cnpj" inputmode="numeric" placeholder="00.000.000/0000-00"></div>
+        <div class="campo l"><label for="endereco">Endereço</label><input id="endereco" autocomplete="street-address"></div>
+        <div class="campo"><label for="telefone">Telefone comercial</label><input id="telefone" type="tel" autocomplete="tel" placeholder="(31) 90000-0000"></div>
+        <div class="campo"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email"></div>
+        <div class="campo"><label for="instagram">Instagram</label><input id="instagram" placeholder="@sualoja"></div>
+        <div class="campo"><label for="site">Site (se tiver)</label><input id="site" type="url" placeholder="https://"></div>
+        <div class="campo l"><label for="segmento">O que vocês vendem</label><input id="segmento" placeholder="Ex.: moda feminina, semijoias, estética"></div>
+      </div>
+    </div>
+
+    <div class="cx"><h2><span class="n">2</span>Loja e sistemas</h2><p class="dica">Para saber onde vamos medir os resultados.</p>
+      <div class="g2">
+        <div class="campo"><label for="plataforma_loja">Plataforma da loja virtual</label><select id="plataforma_loja"><option value="">Selecione</option><option>Nuvemshop</option><option>Shopify</option><option>Tray</option><option>Loja Integrada</option><option>Wix</option><option>Outra</option><option>Não tenho loja virtual</option></select></div>
+        <div class="campo"><label for="erp">Sistema de gestão (estoque e notas)</label><input id="erp" placeholder="Ex.: Bling, Tiny, Phibo, nenhum"></div>
+        <div class="campo"><label for="crm">Usa algum CRM ou sistema de atendimento?</label><input id="crm" placeholder="Ex.: Kommo, nenhum"></div>
+        <div class="campo"><label for="whatsapp">WhatsApp de atendimento</label><select id="whatsapp"><option value="">Selecione</option><option>WhatsApp Business no celular</option><option>API oficial do WhatsApp</option><option>WhatsApp comum</option></select></div>
+        <div class="campo l"><label for="registro_vendas">Como vocês registram as vendas feitas pelo WhatsApp ou Direct?</label><input id="registro_vendas" placeholder="Ex.: no sistema, em planilha, não registramos"></div>
+      </div>
+    </div>
+
+    <div class="cx"><h2><span class="n">3</span>Time</h2><p class="dica">Quem faz o quê na loja.</p>
+      <div class="g2">
+        <div class="campo"><label for="time_tamanho">Quantas pessoas no time</label><input id="time_tamanho" inputmode="numeric"></div>
+        <div class="campo"><label for="horario">Horário de atendimento</label><input id="horario" placeholder="Ex.: seg a sex 9h às 18h, sáb 9h às 13h"></div>
+        <div class="campo l"><label for="time_responsaveis">Quem atende, quem vende e quem aprova os conteúdos</label><textarea id="time_responsaveis" placeholder="Ex.: Ana atende o WhatsApp, eu aprovo os criativos"></textarea></div>
+      </div>
+    </div>
+
+    <div class="cx"><h2><span class="n">4</span>Vendas e anúncios</h2><p class="dica">Uma média já ajuda. Esses números ficam só com a equipe GROUP3989.</p>
+      <div class="g2">
+        <div class="campo l"><label for="faturamento_6m">Faturamento aproximado dos últimos 6 meses</label><textarea id="faturamento_6m" placeholder="Ex.: abril R$ 30 mil, maio R$ 28 mil... ou uma média mensal"></textarea></div>
+        <div class="campo"><label for="ticket_medio">Valor médio de cada venda</label><input id="ticket_medio" placeholder="R$"></div>
+        <div class="campo"><label for="ja_anuncia">Já anuncia hoje?</label><select id="ja_anuncia"><option value="">Selecione</option><option>Sim, com agência ou gestor</option><option>Sim, eu mesma(o) impulsiono</option><option>Não anuncio</option></select></div>
+        <div class="campo"><label for="investimento">Quanto investe por mês em anúncios</label><input id="investimento" placeholder="R$"></div>
+        <div class="campo"><label for="objetivo">Principal objetivo agora</label><input id="objetivo" placeholder="Ex.: vender mais no site, mais clientes novos"></div>
+      </div>
+    </div>
+
+    <div class="cx"><h2><span class="n">5</span>Acesso às contas</h2><p class="dica">Escolha como prefere. Antes, confira se a verificação em duas etapas está ativa no Facebook e no Instagram.</p>
+      <div class="ops">
+        <label class="op"><input type="radio" name="acesso" value="Eu mesma(o) libero o acesso" required><div><b>Eu mesma(o) libero o acesso</b><span>Recomendado. Você dá acesso de parceiro e não precisa passar senha nenhuma.</span>
+          <ol class="passos"><li>Meta: em Configurações do Negócio, Parceiros, adicione o ID <code>254715095964869</code> com acesso à Página, Instagram, conta de anúncios, Pixel e Catálogo.</li><li>Loja virtual: adicione <code>group3989@gmail.com</code> como usuário.</li><li>Google Analytics: adicione <code>group3989@gmail.com</code> como leitor.</li></ol></div></label>
+        <label class="op"><input type="radio" name="acesso" value="Prefiro que a GROUP3989 configure pelo meu login"><div><b>Prefiro que a GROUP3989 configure pelo meu login</b><span>Combine os dados de acesso direto com a equipe pelo WhatsApp. Por segurança, este formulário não recebe senhas. Depois da configuração, apague a mensagem para todos e, se quiser, troque a senha.</span></div></label>
+      </div>
+    </div>
+
+    <div class="cx"><h2><span class="n">6</span>Para fechar</h2>
+      <div class="campo"><label for="observacoes">Algo mais que devemos saber?</label><textarea id="observacoes"></textarea></div>
+      <label class="consent" style="margin-top:16px"><input type="checkbox" id="consentimento" required><span>Autorizo a GROUP3989 (TMA DIGITAL SERVICES LTDA) a usar estes dados só para prestar o serviço contratado, conforme a LGPD e o Termo de Consentimento, Acesso e Confidencialidade. Os dados não são compartilhados com terceiros e posso pedir a exclusão quando quiser.</span></label>
+      <div style="margin-top:18px"><button type="submit" id="enviar">Enviar cadastro</button></div><div id="msg" class="msg"></div>
+    </div>
+  </form>
+</main>
+<footer>GROUP3989 · www.group3989.com · group3989@gmail.com</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config.js"></script>
+<script>
+(function(){
+  var C = window.G3989, sb = window.supabase.createClient(C.supabaseUrl, C.supabaseKey, {auth:{persistSession:false}});
+  function tema(){ var t = null; try { t = localStorage.getItem("g3989:tema"); } catch(e){} return t || (matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro"); }
+  function aplicar(){ document.documentElement.setAttribute("data-tema", tema()); document.getElementById("bTema").textContent = tema() === "claro" ? "☾ Escuro" : "☀ Claro"; }
+  document.getElementById("bTema").onclick = function(){ try { localStorage.setItem("g3989:tema", tema() === "claro" ? "escuro" : "claro"); } catch(e){} aplicar(); };
+  aplicar();
+  var token = new URLSearchParams(location.search).get("t") || "", $ = function(id){ return document.getElementById(id); };
+  var CAMPOS = ["responsavel","empresa","razao_social","cnpj","endereco","telefone","email","instagram","site","segmento","plataforma_loja","erp","crm","whatsapp","registro_vendas","time_tamanho","horario","time_responsaveis","faturamento_6m","ticket_medio","ja_anuncia","investimento","objetivo","observacoes"];
+  if(!/^[0-9a-f-]{36}$/i.test(token)){ $("invalido").hidden = false; return; }
+  sb.rpc("formulario_info", {p_token:token}).then(function(r){
+    var d = r.data && r.data[0];
+    if(r.error || !d){ $("invalido").hidden = false; return; }
+    $("titulo").textContent = "Cadastro de Cliente · " + d.nome;
+    $("empresa").value = d.nome;
+    var pre = d.preenchido || {}, oc = d.ocultos || [];
+    Object.keys(pre).forEach(function(k){
+      if(k === "acesso"){ document.querySelectorAll('input[name="acesso"]').forEach(function(x){ if(x.value === pre[k]) x.checked = true; }); return; }
+      var el = $(k); if(!el) return;
+      if(el.tagName === "SELECT" && !Array.from(el.options).some(function(o){ return o.value === pre[k] || o.text === pre[k]; })){ var o = document.createElement("option"); o.text = pre[k]; el.add(o); }
+      el.value = pre[k];
+    });
+    oc.forEach(function(k){
+      if(k === "acesso"){ document.querySelectorAll('input[name="acesso"]').forEach(function(x){ x.required = false; }); var cx = document.querySelector('input[name="acesso"]').closest(".cx"); cx.hidden = true; return; }
+      var el = $(k); if(!el) return; el.required = false; el.closest(".campo").hidden = true;
+    });
+    /* etapa sem nenhuma pergunta visível some, e a numeração se ajusta */
+    var n = 0;
+    document.querySelectorAll("#form > .cx").forEach(function(cx){
+      var campos = cx.querySelectorAll(".campo"), vis = Array.from(campos).some(function(x){ return !x.hidden; });
+      if(campos.length && !vis && !cx.querySelector("#consentimento")) cx.hidden = true;
+      if(!cx.hidden){ var num = cx.querySelector(".n"); if(num) num.textContent = ++n; }
+    });
+    window.__ACESSO_PRE = pre.acesso || "";
+    $("form").hidden = false;
+  });
+  $("form").onsubmit = function(ev){
+    ev.preventDefault();
+    var dados = {}, b = $("enviar");
+    CAMPOS.forEach(function(k){ var v = $(k).value.trim(); if(v) dados[k] = v; });
+    var ac = document.querySelector('input[name="acesso"]:checked'); if(ac) dados.acesso = ac.value; else if(window.__ACESSO_PRE) dados.acesso = window.__ACESSO_PRE;
+    dados.consentimento = "Aceito em " + new Date().toLocaleString("pt-BR");
+    b.disabled = true; b.textContent = "Enviando…"; $("msg").textContent = "";
+    sb.rpc("enviar_cadastro", {p_token:token, p_dados:dados}).then(function(r){
+      if(r.error || r.data !== true){ b.disabled = false; b.textContent = "Enviar cadastro"; $("msg").className = "msg erro"; $("msg").textContent = "Não conseguimos enviar. Tente de novo em instantes."; return; }
+      $("form").hidden = true; $("pronto").hidden = false; window.scrollTo(0, 0);
+    });
+  };
+})();
+</script>
+</body>
+</html>
