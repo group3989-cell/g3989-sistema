@@ -167,3 +167,12 @@ button{cursor:pointer}
   .campo input,.campo select,.campo textarea,.busca{font-size:16px}
   .cx{padding:16px}
 }
+
+/* arrastar tarefas */
+.item.arrastavel{grid-template-columns:52px minmax(0,1fr) auto}
+.pega{display:flex;align-items:center;gap:6px}
+.alca{cursor:grab;color:var(--tx3);font-size:14px;letter-spacing:-2px;padding:2px 4px;user-select:none;touch-action:none;line-height:1}
+.alca:active{cursor:grabbing}
+.fantasma{opacity:.4;border-style:dashed}
+.arrasta{min-height:8px}
+@media(max-width:600px){.item.arrastavel{grid-template-columns:52px minmax(0,1fr)}.item.arrastavel .tags{grid-column:2}.item.arrastavel .obs{grid-column:1/3}}

@@ -139,7 +139,7 @@
     if(T === null){ $("main").innerHTML = '<div class="topo"><div><div class="mig">GROUP3989</div><h2>Hoje</h2></div></div><div class="conteudo"><div class="vazio">A tabela de tarefas ainda não existe. Rode o SQL 004 no Supabase.</div></div>'; return; }
     var hoje = new Date().toISOString().slice(0, 10);
     var abertas = T.filter(function(t){ return !t.feito; }), feitasHoje = T.filter(function(t){ return t.feito && String(t.feito_em || "").slice(0, 10) === hoje; });
-    function chave(t){ return (t.feito ? "1" : "0") + (t.prazo || "9999-12-31") + t.prioridade + String(t.ordem).padStart(3, "0"); }
+    function chave(t){ return (t.feito ? "1" : "0") + String(t.ordem || 0).padStart(4, "0") + (t.prazo || "9999-12-31") + t.prioridade; }
     var vis = T.filter(function(t){ return !t.feito; }).sort(function(a, b){ return chave(a).localeCompare(chave(b)); });
     var grupos = []; vis.forEach(function(t){ if(grupos.indexOf(t.grupo) < 0) grupos.push(t.grupo); });
     var atrasadas = abertas.filter(function(t){ return t.prazo && t.prazo < hoje; }).length, deHoje = abertas.filter(function(t){ return t.prazo === hoje; }).length;
@@ -152,15 +152,21 @@
       '<input class="busca" id="tPrazo" type="date" style="margin:0;width:auto" value="' + hoje + '" title="Prazo"><select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select><button class="bt pri" type="submit">Adicionar</button></form></div>' +
       (vis.length ? grupos.map(function(g){
         var L = vis.filter(function(t){ return t.grupo === g; }), f = L.filter(function(t){ return t.feito; }).length, urg = L.some(function(t){ return !t.feito && t.prioridade === 1; });
-        return '<div class="bloco"><h4>' + esc(g) + ' <small>' + f + '/' + L.length + '</small>' + (urg ? ' <span class="selo" style="background:var(--al-s);color:var(--al)">urgente</span>' : "") + '</h4>' + L.map(function(t){
+        return '<div class="bloco"><h4>' + esc(g) + ' <small>' + f + '/' + L.length + '</small>' + (urg ? ' <span class="selo" style="background:var(--al-s);color:var(--al)">urgente</span>' : "") + '</h4><div class="arrasta" data-grupo="' + esc(g) + '">' + L.map(function(t){
           var cli = t.cliente_id ? cliPorId(t.cliente_id) : null;
-          return '<div class="item' + (t.feito ? " feito" : "") + '"><button class="tick" role="checkbox" aria-checked="' + t.feito + '" aria-label="Marcar como feita" data-tf="' + t.id + '">' + (t.feito ? "✓" : "") + '</button>' +
+          if(est.editT === t.id) return '<form class="item" data-fe="' + t.id + '" style="grid-template-columns:1fr;gap:8px">' +
+            '<div class="g2"><div class="campo"><label>Tarefa</label><input name="texto" value="' + esc(t.texto) + '" required></div><div class="campo"><label>Grupo</label><input name="grupo" value="' + esc(t.grupo) + '" list="gruposT"></div></div>' +
+            '<div class="campo"><label>Detalhe</label><input name="detalhe" value="' + esc(t.detalhe || "") + '"></div>' +
+            '<div class="g2"><div class="campo"><label>Prazo</label><input name="prazo" type="date" value="' + esc(t.prazo || "") + '"></div><div class="campo"><label>Prioridade</label><select name="prioridade"><option value="1"' + (t.prioridade === 1 ? " selected" : "") + '>Urgente</option><option value="2"' + (t.prioridade === 2 ? " selected" : "") + '>Normal</option><option value="3"' + (t.prioridade === 3 ? " selected" : "") + '>Sem pressa</option></select></div></div>' +
+            '<div class="linha"><button class="bt pri p" type="submit">Salvar</button><button class="bt p" type="button" data-cancela="1">Cancelar</button><span style="flex:1"></span><button class="bt p perigo" type="button" data-apaga="' + t.id + '">Excluir tarefa</button></div></form>';
+          return '<div class="item arrastavel' + (t.feito ? " feito" : "") + '" data-id="' + t.id + '"><div class="pega"><span class="alca" title="Arraste para mudar a ordem" aria-label="Arrastar">⋮⋮</span><button class="tick" role="checkbox" aria-checked="' + t.feito + '" aria-label="Marcar como feita" data-tf="' + t.id + '">' + (t.feito ? "✓" : "") + '</button></div>' +
             '<div><div class="itx">' + esc(t.texto) + '</div>' + (t.detalhe ? '<div class="quando">' + esc(t.detalhe) + '</div>' : "") + (t.feito && t.feito_em ? '<div class="quando">Feita por ' + esc(t.feito_por || "") + ' em ' + dataBR(t.feito_em) + '</div>' : "") + '</div>' +
-            '<div class="tags">' + (t.prioridade === 1 && !t.feito ? '<span class="selo" style="background:var(--al-s);color:var(--al)">Urgente</span>' : t.prioridade === 3 ? '<span class="selo manual">Sem pressa</span>' : "") + '<label class="selo ' + (!t.feito && t.prazo && t.prazo < hoje ? '" style="background:var(--al-s);color:var(--al)' : !t.feito && t.prazo === hoje ? 'api' : 'manual') + '" title="Prazo">' + (!t.feito && t.prazo && t.prazo < hoje ? 'atrasada ' : !t.feito && t.prazo === hoje ? 'hoje ' : '') + '<input type="date" data-tp="' + t.id + '" value="' + esc(t.prazo || "") + '" style="border:0;background:transparent;color:inherit;font:inherit;padding:0;width:' + (t.prazo ? '104px' : '96px') + '"></label>' + (cli ? '<button class="selo api" style="border:0;cursor:pointer" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + '<span class="selo manual">' + esc(t.criado_por) + '</span></div>' +
+            '<div class="tags">' + (t.prioridade === 1 && !t.feito ? '<span class="selo" style="background:var(--al-s);color:var(--al)">Urgente</span>' : t.prioridade === 3 ? '<span class="selo manual">Sem pressa</span>' : "") + '<label class="selo ' + (!t.feito && t.prazo && t.prazo < hoje ? '" style="background:var(--al-s);color:var(--al)' : !t.feito && t.prazo === hoje ? 'api' : 'manual') + '" title="Prazo">' + (!t.feito && t.prazo && t.prazo < hoje ? 'atrasada ' : !t.feito && t.prazo === hoje ? 'hoje ' : '') + '<input type="date" data-tp="' + t.id + '" value="' + esc(t.prazo || "") + '" style="border:0;background:transparent;color:inherit;font:inherit;padding:0;width:' + (t.prazo ? '104px' : '96px') + '"></label>' + (cli ? '<button class="selo api" style="border:0;cursor:pointer" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + '<span class="selo manual">' + esc(/^virada:/.test(t.origem || "") ? "Virada" : t.criado_por) + '</span><button class="selo manual" style="border:0;cursor:pointer" data-edita="' + t.id + '" title="Editar tarefa">✎ Editar</button></div>' +
             '<input class="obs" data-to="' + t.id + '" value="' + esc(t.observacao || "") + '" placeholder="Observação ou motivo de não ter feito"></div>';
-        }).join("") + '</div>';
+        }).join("") + '</div></div>';
       }).join("") : '<div class="vazio">Nenhuma tarefa aberta. Peça ao Claude: "monta as tarefas de hoje".</div>') + '</div>';
     $("bVerFeitas").onclick = function(){ est.verFeitas = !est.verFeitas; telaHoje(); };
+    ligarArrastar(T);
     if(est.verFeitas) return historicoFeitas(T);
     document.querySelectorAll("[data-abre]").forEach(function(b){ b.onclick = function(){ abrirCliente(b.dataset.abre); }; });
     document.querySelectorAll("[data-tf]").forEach(function(b){ b.onclick = function(){
@@ -170,7 +176,19 @@
     }; });
     document.querySelectorAll("[data-tp]").forEach(function(inp){ inp.onchange = function(){
       var t = T.filter(function(x){ return x.id === inp.dataset.tp; })[0], v = inp.value || null;
-      sb.from("tarefas").update({prazo:v}).eq("id", t.id).then(function(r){ if(r.error) return alertaErro(r.error); t.prazo = v; telaHoje(); });
+      sb.from("tarefas").update({prazo:v, editado:true}).eq("id", t.id).then(function(r){ if(r.error) return alertaErro(r.error); t.prazo = v; telaHoje(); });
+    }; });
+    document.querySelectorAll("[data-edita]").forEach(function(b){ b.onclick = function(){ est.editT = b.dataset.edita; telaHoje(); }; });
+    document.querySelectorAll("[data-cancela]").forEach(function(b){ b.onclick = function(){ est.editT = null; telaHoje(); }; });
+    document.querySelectorAll("[data-apaga]").forEach(function(b){ var conf = false; b.onclick = function(){
+      if(!conf){ conf = true; b.textContent = "Clique de novo para excluir"; return; }
+      sb.from("tarefas").delete().eq("id", b.dataset.apaga).then(function(r){ if(r.error) return alertaErro(r.error); est.tarefas = T.filter(function(x){ return x.id !== b.dataset.apaga; }); est.editT = null; render(); });
+    }; });
+    document.querySelectorAll("[data-fe]").forEach(function(f){ f.onsubmit = function(ev){
+      ev.preventDefault();
+      var t = T.filter(function(x){ return x.id === f.dataset.fe; })[0], el = f.elements;
+      var u = {texto:el.texto.value.trim(), grupo:el.grupo.value.trim() || "Geral", detalhe:el.detalhe.value.trim() || null, prazo:el.prazo.value || null, prioridade:+el.prioridade.value, editado:true};
+      sb.from("tarefas").update(u).eq("id", t.id).then(function(r){ if(r.error) return alertaErro(r.error); Object.assign(t, u); est.editT = null; telaHoje(); });
     }; });
     document.querySelectorAll("[data-to]").forEach(function(inp){ inp.onchange = function(){
       var t = T.filter(function(x){ return x.id === inp.dataset.to; })[0], v = inp.value.trim() || null;
@@ -189,6 +207,30 @@
       L.push("", "Lê a tabela de tarefas no Supabase, registra o que precisa e me diz o próximo passo de cada aberta.");
       copiar(L.join("\n"), $("hMsg"), "Copiado. Cole no chat do Claude.");
     };
+  }
+
+  /* arrastar: muda a ordem dentro do grupo ou leva a tarefa para outro grupo (funciona no toque) */
+  function ligarArrastar(T){
+    if(!window.Sortable || est.verFeitas) return;
+    document.querySelectorAll(".arrasta").forEach(function(lista){
+      Sortable.create(lista, {group:"tarefas", handle:".alca", animation:150, ghostClass:"fantasma", delay:120, delayOnTouchOnly:true,
+        onEnd:function(ev){
+          var destino = ev.to, origem = ev.from, mudancas = [];
+          [destino].concat(origem !== destino ? [origem] : []).forEach(function(el){
+            var g = el.dataset.grupo;
+            Array.from(el.querySelectorAll(":scope > .item[data-id]")).forEach(function(it, i){
+              var t = T.filter(function(x){ return x.id === it.dataset.id; })[0]; if(!t) return;
+              var u = {ordem:i + 1};
+              if(t.grupo !== g){ u.grupo = g; u.editado = true; }
+              if(t.ordem !== u.ordem || u.grupo){ Object.assign(t, u); mudancas.push([t.id, u]); }
+            });
+          });
+          Promise.all(mudancas.map(function(m){ return sb.from("tarefas").update(m[1]).eq("id", m[0]); })).then(function(r){
+            var erro = r.filter(function(x){ return x.error; })[0]; if(erro) alertaErro(erro.error);
+            if(origem !== destino) telaHoje();
+          });
+        }});
+    });
   }
 
   /* histórico: tudo o que foi feito, do mais recente para o mais antigo, agrupado por dia; dá para desfazer */
