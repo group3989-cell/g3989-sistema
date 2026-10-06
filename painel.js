@@ -42,7 +42,7 @@
   sb.auth.getSession().then(function(r){ est.sessao = r.data.session; inicio(); });
   sb.auth.onAuthStateChange(function(_, s){ var antes = !!est.sessao; est.sessao = s; if(antes !== !!s) inicio(); });
 
-  function inicio(){ if(!est.sessao) return telaLogin(); carregar().then(render); }
+  function inicio(){ if(!est.sessao) return telaLogin(); carregar().then(function(){ est.atualizadoEm = new Date(); render(); }); }
 
   function telaLogin(){
     app.innerHTML = '<div class="login"><form id="fLogin"><img src="assets/logo-azul.png" alt="GROUP3989"><h1>Sistema G3989</h1><p>Acesso da equipe</p>' +
@@ -81,6 +81,13 @@
   function pct(id){ var p = est.progresso[id]; return p && p.t ? Math.round(100 * p.f / p.t) : 0; }
 
   /* ---------- casca ---------- */
+  /* atualizar: busca de novo no banco tudo o que o Claude ou a equipe mudou */
+  function atualizar(){
+    var b = document.getElementById("bAtualizar"); if(b){ b.disabled = true; b.textContent = "Atualizando…"; }
+    return carregar().then(function(){ est.atualizadoEm = new Date(); render(); }).catch(function(e){ alertaErro(e); render(); });
+  }
+  document.addEventListener("keydown", function(e){ var a = e.target; if((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) && est.sessao){ e.preventDefault(); atualizar(); } });
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible" && est.sessao && (!est.atualizadoEm || Date.now() - est.atualizadoEm > 60000)) atualizar(); });
   function render(){
     var lista = est.clientes.filter(function(c){ return !est.busca || (c.nome + " " + (c.razao_social || "")).toLowerCase().indexOf(est.busca.toLowerCase()) >= 0; });
     app.innerHTML = '<div class="app' + (est.min ? " min" : "") + '"><aside class="lado">' +
@@ -96,10 +103,12 @@
       '<button class="cli" data-v="novo" aria-current="' + (est.view === "novo") + '"><span class="ini">+</span><span class="tx"><span class="nm">Novo cliente</span></span></button></div>' +
       '<div class="ferr"><div class="rot" style="padding:4px 8px">Ferramentas</div>' + C.ferramentas.map(function(f){ return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">' + esc(f.nome) + ' ↗</a>'; }).join("") + '</div>' +
       '<div class="pe"><button class="sair" id="bSair">⎋ <span>Sair (' + esc(autor()) + ')</span></button><span style="flex:1"></span><button class="tema" id="bTema" title="Trocar tema claro ou escuro">' + rotTema() + '</button></div></aside>' +
-      '<main id="main"></main></div>';
+      '<main id="main"></main></div>' +
+      '<button class="bt pri" id="bAtualizar" title="Atualizar (R)" style="position:fixed;right:16px;bottom:16px;z-index:9;box-shadow:0 10px 24px -10px rgba(0,0,0,.5)">↻ Atualizar' + (est.atualizadoEm ? ' <small style="opacity:.8;font-weight:400">' + est.atualizadoEm.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"}) + '</small>' : '') + '</button>';
     $("bMin").onclick = function(){ est.min = !est.min; try { localStorage.setItem("g3989:lado-min", est.min ? "1" : "0"); } catch(e){} render(); };
     $("busca").oninput = function(){ est.busca = this.value; var p = this.selectionStart; render(); var b = $("busca"); b.focus(); b.setSelectionRange(p, p); };
     $("bSair").onclick = function(){ sb.auth.signOut(); };
+    $("bAtualizar").onclick = atualizar;
     $("bTema").onclick = trocarTema;
     app.querySelectorAll("[data-c]").forEach(function(b){ b.onclick = function(){ est.atual = est.clientes.filter(function(c){ return c.id === b.dataset.c; })[0]; est.view = "cliente"; render(); }; });
     app.querySelectorAll("[data-v]").forEach(function(b){ b.onclick = function(){ est.view = b.dataset.v; est.atual = null; render(); }; });
@@ -130,22 +139,24 @@
     if(T === null){ $("main").innerHTML = '<div class="topo"><div><div class="mig">GROUP3989</div><h2>Hoje</h2></div></div><div class="conteudo"><div class="vazio">A tabela de tarefas ainda não existe. Rode o SQL 004 no Supabase.</div></div>'; return; }
     var hoje = new Date().toISOString().slice(0, 10);
     var abertas = T.filter(function(t){ return !t.feito; }), feitasHoje = T.filter(function(t){ return t.feito && String(t.feito_em || "").slice(0, 10) === hoje; });
-    var vis = T.filter(function(t){ return !t.feito || est.verFeitas || String(t.feito_em || "").slice(0, 10) === hoje; });
+    function chave(t){ return (t.feito ? "1" : "0") + (t.prazo || "9999-12-31") + t.prioridade + String(t.ordem).padStart(3, "0"); }
+    var vis = T.filter(function(t){ return !t.feito || est.verFeitas || String(t.feito_em || "").slice(0, 10) === hoje; }).sort(function(a, b){ return chave(a).localeCompare(chave(b)); });
     var grupos = []; vis.forEach(function(t){ if(grupos.indexOf(t.grupo) < 0) grupos.push(t.grupo); });
+    var atrasadas = abertas.filter(function(t){ return t.prazo && t.prazo < hoje; }).length, deHoje = abertas.filter(function(t){ return t.prazo === hoje; }).length;
     var tot = abertas.length + feitasHoje.length, p = tot ? Math.round(100 * feitasHoje.length / tot) : 0;
     var dataTxt = new Date().toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long"});
     $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>Hoje</h2></div><span class="esp"></span>' +
       '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "Esconder feitas antigas" : "Ver todas as feitas") + '</button><button class="bt p pri" id="bClaudeHoje">Copiar situação para o Claude</button><span id="hMsg" class="msg"></span></div>' +
-      '<div class="conteudo"><div class="cx"><div class="linha"><h3>' + abertas.length + (abertas.length === 1 ? ' tarefa aberta' : ' tarefas abertas') + '</h3><span style="flex:1"></span><span class="msg">' + feitasHoje.length + ' feitas hoje</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
+      '<div class="conteudo"><div class="cx"><div class="linha"><h3>' + abertas.length + (abertas.length === 1 ? ' tarefa aberta' : ' tarefas abertas') + '</h3><span style="flex:1"></span><span class="msg">' + (atrasadas ? '<b style="color:var(--al)">' + atrasadas + ' atrasadas</b> · ' : "") + deHoje + ' para hoje · ' + feitasHoje.length + ' feitas hoje</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
       '<form class="linha" id="fTarefa" style="margin-top:12px"><input class="busca" id="tTexto" style="margin:0;flex:2 1 240px" placeholder="Nova tarefa" required><input class="busca" id="tGrupo" style="margin:0;flex:1 1 140px" placeholder="Grupo (ex.: Trendyce)" list="gruposT"><datalist id="gruposT">' + grupos.map(function(g){ return '<option value="' + esc(g) + '">'; }).join("") + '</datalist>' +
-      '<select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select><button class="bt pri" type="submit">Adicionar</button></form></div>' +
+      '<input class="busca" id="tPrazo" type="date" style="margin:0;width:auto" value="' + hoje + '" title="Prazo"><select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select><button class="bt pri" type="submit">Adicionar</button></form></div>' +
       (vis.length ? grupos.map(function(g){
         var L = vis.filter(function(t){ return t.grupo === g; }), f = L.filter(function(t){ return t.feito; }).length, urg = L.some(function(t){ return !t.feito && t.prioridade === 1; });
         return '<div class="bloco"><h4>' + esc(g) + ' <small>' + f + '/' + L.length + '</small>' + (urg ? ' <span class="selo" style="background:var(--al-s);color:var(--al)">urgente</span>' : "") + '</h4>' + L.map(function(t){
           var cli = t.cliente_id ? cliPorId(t.cliente_id) : null;
           return '<div class="item' + (t.feito ? " feito" : "") + '"><button class="tick" role="checkbox" aria-checked="' + t.feito + '" aria-label="Marcar como feita" data-tf="' + t.id + '">' + (t.feito ? "✓" : "") + '</button>' +
             '<div><div class="itx">' + esc(t.texto) + '</div>' + (t.detalhe ? '<div class="quando">' + esc(t.detalhe) + '</div>' : "") + (t.feito && t.feito_em ? '<div class="quando">Feita por ' + esc(t.feito_por || "") + ' em ' + dataBR(t.feito_em) + '</div>' : "") + '</div>' +
-            '<div class="tags">' + (t.prioridade === 1 && !t.feito ? '<span class="selo" style="background:var(--al-s);color:var(--al)">Urgente</span>' : t.prioridade === 3 ? '<span class="selo manual">Sem pressa</span>' : "") + (t.prazo ? '<span class="selo manual">até ' + esc(t.prazo.split("-").reverse().slice(0, 2).join("/")) + '</span>' : "") + (cli ? '<button class="selo api" style="border:0;cursor:pointer" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + '<span class="selo manual">' + esc(t.criado_por) + '</span></div>' +
+            '<div class="tags">' + (t.prioridade === 1 && !t.feito ? '<span class="selo" style="background:var(--al-s);color:var(--al)">Urgente</span>' : t.prioridade === 3 ? '<span class="selo manual">Sem pressa</span>' : "") + '<label class="selo ' + (!t.feito && t.prazo && t.prazo < hoje ? '" style="background:var(--al-s);color:var(--al)' : !t.feito && t.prazo === hoje ? 'api' : 'manual') + '" title="Prazo">' + (!t.feito && t.prazo && t.prazo < hoje ? 'atrasada ' : !t.feito && t.prazo === hoje ? 'hoje ' : '') + '<input type="date" data-tp="' + t.id + '" value="' + esc(t.prazo || "") + '" style="border:0;background:transparent;color:inherit;font:inherit;padding:0;width:' + (t.prazo ? '104px' : '96px') + '"></label>' + (cli ? '<button class="selo api" style="border:0;cursor:pointer" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + '<span class="selo manual">' + esc(t.criado_por) + '</span></div>' +
             '<input class="obs" data-to="' + t.id + '" value="' + esc(t.observacao || "") + '" placeholder="Observação ou motivo de não ter feito"></div>';
         }).join("") + '</div>';
       }).join("") : '<div class="vazio">Nenhuma tarefa aberta. Peça ao Claude: "monta as tarefas de hoje".</div>') + '</div>';
@@ -156,20 +167,24 @@
       var u = {feito:novo, feito_em:novo ? new Date().toISOString() : null, feito_por:novo ? autor() : null};
       sb.from("tarefas").update(u).eq("id", t.id).then(function(r){ if(r.error){ b.disabled = false; return alertaErro(r.error); } Object.assign(t, u); render(); });
     }; });
+    document.querySelectorAll("[data-tp]").forEach(function(inp){ inp.onchange = function(){
+      var t = T.filter(function(x){ return x.id === inp.dataset.tp; })[0], v = inp.value || null;
+      sb.from("tarefas").update({prazo:v}).eq("id", t.id).then(function(r){ if(r.error) return alertaErro(r.error); t.prazo = v; telaHoje(); });
+    }; });
     document.querySelectorAll("[data-to]").forEach(function(inp){ inp.onchange = function(){
       var t = T.filter(function(x){ return x.id === inp.dataset.to; })[0], v = inp.value.trim() || null;
       sb.from("tarefas").update({observacao:v}).eq("id", t.id).then(function(r){ inp.style.borderColor = r.error ? "var(--al)" : "var(--ok)"; if(!r.error) t.observacao = v; });
     }; });
     $("fTarefa").onsubmit = function(ev){
       ev.preventDefault();
-      var d = {texto:$("tTexto").value.trim(), grupo:$("tGrupo").value.trim() || "Geral", prioridade:+$("tPri").value, criado_por:autor()};
+      var d = {texto:$("tTexto").value.trim(), grupo:$("tGrupo").value.trim() || "Geral", prioridade:+$("tPri").value, prazo:$("tPrazo").value || null, criado_por:autor()};
       sb.from("tarefas").insert(d).select().single().then(function(r){ if(r.error) return alertaErro(r.error); T.push(r.data); render(); });
     };
     $("bClaudeHoje").onclick = function(){
       var feitas = T.filter(function(t){ return t.feito && String(t.feito_em || "").slice(0, 10) === hoje; }), L = ["Claude, situação das tarefas de hoje no Sistema G3989:", "", "FEITAS HOJE (" + feitas.length + "):"];
       feitas.forEach(function(t){ L.push("- " + t.texto + (t.observacao ? " (obs.: " + t.observacao + ")" : "")); });
       L.push("", "ABERTAS (" + abertas.length + "):");
-      abertas.forEach(function(t){ L.push("- [" + t.grupo + "] " + t.texto + (t.observacao ? " | motivo: " + t.observacao : "")); });
+      abertas.slice().sort(function(a, b){ return chave(a).localeCompare(chave(b)); }).forEach(function(t){ L.push("- " + (t.prazo ? t.prazo.split("-").reverse().slice(0, 2).join("/") + " " : "sem prazo ") + "[" + t.grupo + "] " + t.texto + (t.observacao ? " | motivo: " + t.observacao : "")); });
       L.push("", "Lê a tabela de tarefas no Supabase, registra o que precisa e me diz o próximo passo de cada aberta.");
       copiar(L.join("\n"), $("hMsg"), "Copiado. Cole no chat do Claude.");
     };
