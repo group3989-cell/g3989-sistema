@@ -21,6 +21,17 @@
   var FORM = [["Empresa",["responsavel","empresa","razao_social","cnpj","endereco","telefone","email","instagram","site","segmento"]],
     ["Loja e sistemas",["plataforma_loja","erp","crm","whatsapp","registro_vendas"]],["Time",["time_tamanho","horario","time_responsaveis"]],
     ["Vendas e anúncios",["faturamento_6m","ticket_medio","ja_anuncia","investimento","objetivo"]],["Acesso",["acesso"]],["Para fechar",["observacoes"]]];
+  var EXTRA = ["endereco","telefone","email","whatsapp","crm","registro_vendas","horario","time_tamanho","time_responsaveis","ticket_medio","faturamento_6m","ja_anuncia","investimento","objetivo","acesso"];
+  var LONGOS = ["endereco","time_responsaveis","faturamento_6m","objetivo","acesso"];
+  /* leva tudo o que o cliente mandou: colunas da ficha, IDs e o resto em formulario.preenchido */
+  function doFormulario(c, d){
+    var ids = Object.assign({}, c.ids || {}); if(d.site) ids.loja_url = d.site; if(d.instagram) ids.instagram = d.instagram;
+    var f = c.formulario || {}, pre = Object.assign({}, f.preenchido || {});
+    Object.keys(d).forEach(function(k){ var v = d[k]; if(k === "consentimento" || v == null || v === "") return; pre[k] = Array.isArray(v) ? v.join(", ") : String(v); });
+    var u = {ids:ids, formulario:{preenchido:pre, ocultos:f.ocultos || []}, atualizado_em:new Date().toISOString()};
+    [["razao_social","razao_social"],["cnpj","cnpj"],["responsavel","responsavel"],["segmento","segmento"],["plataforma_loja","plataforma_loja"],["erp","erp"]].forEach(function(q){ if(d[q[0]]) u[q[1]] = d[q[0]]; });
+    return u;
+  }
   /* o que a ficha já sabe vira sugestão de preenchido */
   function daFicha(c, k){ var ids = c.ids || {}; return {responsavel:c.responsavel, empresa:c.nome, razao_social:c.razao_social, cnpj:c.cnpj, segmento:c.segmento, plataforma_loja:c.plataforma_loja, erp:c.erp, site:ids.loja_url, instagram:ids.instagram}[k] || ""; }
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
@@ -514,17 +525,20 @@
       f("fPlat", "Plataforma da loja", c.plataforma_loja, "Nuvemshop, Shopify") + f("fErp", "ERP", c.erp, "Bling, Phibo") + '</div>' +
       '<div class="campo" style="margin-top:12px"><label>Tipo de cliente</label>' + opcoesTipos(c.tipos) + '</div>' +
       '<h3 style="margin-top:20px">IDs para eu executar via API</h3><div class="g3" style="margin-top:12px">' + IDS.map(function(x){ return f("id_" + x[0], x[1], ids[x[0]]); }).join("") + '</div>' +
+      '<h3 style="margin-top:20px">Contato e operação</h3><div class="dica">Vem do formulário do cliente. O que estiver aqui também aparece preenchido se ele abrir o formulário de novo.</div><div class="g3" style="margin-top:12px">' + EXTRA.map(function(k){ var v = ((c.formulario || {}).preenchido || {})[k] || "";
+        return LONGOS.indexOf(k) >= 0 ? '<div class="campo"><label for="ex_' + k + '">' + esc(ROT_CAD[k] || k) + '</label><textarea id="ex_' + k + '" rows="2">' + esc(v) + '</textarea></div>' : f("ex_" + k, esc(ROT_CAD[k] || k), v); }).join("") + '</div>' +
       '<div class="campo" style="margin-top:12px"><label for="fObs">Observações</label><textarea id="fObs">' + esc(c.observacoes || "") + '</textarea></div>' +
       '<div class="linha" style="margin-top:16px"><button class="bt pri" type="submit">Salvar ficha</button><span id="fMsg" class="msg"></span><span style="flex:1"></span><button class="bt perigo p" type="button" id="bExcluir">Excluir cliente</button></div></form>';
     $("bLink").onclick = function(){ copiar(linkForm(c), $("lMsg2"), "Link copiado"); };
     ligarFormulario(c);
     $("fFicha").onsubmit = function(ev){
       ev.preventDefault();
-      var m = $("fMsg"), novosIds = {}; IDS.forEach(function(x){ var v = $("id_" + x[0]).value.trim(); if(v) novosIds[x[0]] = v; });
+      var m = $("fMsg"), novosIds = Object.assign({}, c.ids || {}); IDS.forEach(function(x){ var v = $("id_" + x[0]).value.trim(); if(v) novosIds[x[0]] = v; else delete novosIds[x[0]]; });
+      var fo = c.formulario || {}, pre = Object.assign({}, fo.preenchido || {}); EXTRA.forEach(function(k){ var v = $("ex_" + k).value.trim(); if(v) pre[k] = v; else delete pre[k]; });
       var tipos = lerTipos(), mudouTipo = tipos.slice().sort().join() !== (c.tipos || []).slice().sort().join();
       var dados = {nome:$("fNome").value.trim() || c.nome, razao_social:$("fRazao").value.trim() || null, cnpj:$("fCnpj").value.trim() || null, responsavel:$("fResp").value.trim() || null,
         segmento:$("fSeg").value.trim() || null, cidade:$("fCid").value.trim() || null, status:$("fStatus").value, inicio_teste:$("fIni").value || null,
-        plataforma_loja:$("fPlat").value.trim() || null, erp:$("fErp").value.trim() || null, tipos:tipos, ids:novosIds, observacoes:$("fObs").value.trim() || null, atualizado_em:new Date().toISOString()};
+        plataforma_loja:$("fPlat").value.trim() || null, erp:$("fErp").value.trim() || null, tipos:tipos, ids:novosIds, formulario:{preenchido:pre, ocultos:fo.ocultos || []}, observacoes:$("fObs").value.trim() || null, atualizado_em:new Date().toISOString()};
       m.className = "msg"; m.textContent = "Salvando…";
       sb.from("clientes").update(dados).eq("id", c.id).then(function(u){
         if(u.error) throw u.error;
@@ -558,9 +572,10 @@
       document.querySelectorAll("[data-fv]").forEach(function(i){ var v = i.value.trim(); if(v) pre[i.dataset.fv] = v; });
       document.querySelectorAll("[data-fo]:checked").forEach(function(i){ oc.push(i.dataset.fo); });
       var m = $("foMsg"); m.className = "msg"; m.textContent = "Salvando…";
+      pre = Object.assign({}, (c.formulario || {}).preenchido || {}, pre); FORM.forEach(function(sec){ sec[1].forEach(function(k){ var i = document.querySelector('[data-fv="' + k + '"]'); if(i && !i.value.trim()) delete pre[k]; }); });
       sb.from("clientes").update({formulario:{preenchido:pre, ocultos:oc}, atualizado_em:new Date().toISOString()}).eq("id", c.id).then(function(u){
         if(u.error){ m.className = "msg erro"; m.textContent = erroMsg(u.error); return; }
-        c.formulario = {preenchido:pre, ocultos:oc}; m.className = "msg ok"; m.textContent = "Salvo. " + Object.keys(pre).length + " preenchidos, " + oc.length + " fora do formulário.";
+        c.formulario = {preenchido:pre, ocultos:oc}; EXTRA.forEach(function(k){ var i = $("ex_" + k); if(i) i.value = pre[k] || ""; }); m.className = "msg ok"; m.textContent = "Salvo. " + Object.keys(pre).length + " preenchidos, " + oc.length + " fora do formulário.";
       });
     };
   }
@@ -571,12 +586,10 @@
       var d = L[0].dados || {};
       corpo.innerHTML = '<div class="cx"><div class="linha"><h3>Formulário enviado</h3><span style="flex:1"></span><span class="msg">' + dataBR(L[0].enviado_em) + (L.length > 1 ? " · " + L.length + " envios" : "") + '</span></div>' +
         '<dl class="dados" style="margin-top:14px">' + Object.keys(d).map(function(k){ var v = d[k]; if(Array.isArray(v)) v = v.join(", "); else if(v && typeof v === "object") v = JSON.stringify(v); return '<dt>' + esc(ROT_CAD[k] || k) + '</dt><dd>' + esc(v) + '</dd>'; }).join("") + '</dl>' +
-        '<div class="linha" style="margin-top:16px"><button class="bt pri" id="bAplicar">Levar para a ficha</button><span id="aMsg" class="msg"></span></div><div class="dica" style="margin-top:6px">Preenche razão social, CNPJ, responsável, segmento, plataforma, ERP e a URL da loja. O que já estiver na ficha é trocado pelo que o cliente mandou.</div></div>';
+        '<div class="linha" style="margin-top:16px"><button class="bt pri" id="bAplicar">Levar para a ficha</button><span id="aMsg" class="msg"></span></div><div class="dica" style="margin-top:6px">Leva tudo para a ficha: dados da empresa, IDs (site e Instagram) e o bloco Contato e operação (endereço, telefone, e-mail, WhatsApp, horário, time, vendas). O que já estiver na ficha é trocado pelo que o cliente mandou.</div></div>';
       $("bAplicar").onclick = function(){
-        var ids = Object.assign({}, c.ids || {}); if(d.site) ids.loja_url = d.site; if(d.instagram) ids.instagram = d.instagram;
-        var u = {ids:ids, atualizado_em:new Date().toISOString()};
-        [["razao_social","razao_social"],["cnpj","cnpj"],["responsavel","responsavel"],["segmento","segmento"],["plataforma_loja","plataforma_loja"],["erp","erp"]].forEach(function(p){ if(d[p[0]]) u[p[1]] = d[p[0]]; });
-        sb.from("clientes").update(u).eq("id", c.id).then(function(x){ var m = $("aMsg"); if(x.error){ m.className = "msg erro"; m.textContent = erroMsg(x.error); return; } m.className = "msg ok"; m.textContent = "Ficha atualizada"; carregar(); });
+        var u = doFormulario(c, d);
+        sb.from("clientes").update(u).eq("id", c.id).then(function(x){ var m = $("aMsg"); if(x.error){ m.className = "msg erro"; m.textContent = erroMsg(x.error); return; } m.className = "msg ok"; m.textContent = "Ficha atualizada com tudo o que o cliente mandou"; Object.assign(c, u); carregar(); });
       };
     });
   }
