@@ -472,6 +472,8 @@
     ({checklist:abaChecklist, fechamentos:abaFechamentos, ficha:abaFicha, cadastro:abaCadastro, registro:abaRegistro})[est.aba](c);
   }
 
+  /* item marcado com ✕: não vai ser feito (fica resolvido, com o motivo na observação) */
+  function naoFeito(x){ return !!x.feito && /^Não feito/.test(x.feito_por || ""); }
   function abaChecklist(c){
     sb.from("checklist_cliente").select("*").eq("cliente_id", c.id).order("bloco").order("ordem").then(function(r){
       var itens = r.data || [], corpo = $("corpo");
@@ -487,20 +489,31 @@
         (itens.length ? Object.keys(blocos).map(function(b){
           var L = blocos[b], f = L.filter(function(x){ return x.feito; }).length;
           return '<div class="bloco"><h4>' + esc(b) + ' <small>' + f + '/' + L.length + '</small></h4>' + L.map(function(x){
-            return '<div class="item' + (x.feito ? " feito" : "") + '"><button class="tick" role="checkbox" aria-checked="' + x.feito + '" aria-label="Marcar como feito" data-t="' + x.id + '">' + (x.feito ? "✓" : "") + '</button>' +
-              '<div><div class="itx">' + esc(x.item) + '</div>' + (/link do formul/i.test(x.item) ? '<div class="linha" style="margin-top:6px"><button class="bt p" data-copia-link="1">Copiar link</button><a class="bt p" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(msgForm(c)) + '">Enviar no WhatsApp</a><span class="msg" id="lkMsg"></span></div>' : "") + (x.feito && x.feito_em ? '<div class="quando">Feito por ' + esc(x.feito_por || "") + ' em ' + dataBR(x.feito_em) + '</div>' : "") + '</div>' +
+            var nf = naoFeito(x), ok = x.feito && !nf;
+            return '<div class="item' + (ok ? " feito" : "") + (nf ? " naofeito" : "") + '"><div class="marcas"><button class="tick" role="checkbox" aria-checked="' + ok + '" aria-label="Marcar como feito" title="Feito" data-t="' + x.id + '">' + (ok ? "✓" : "") + '</button>' +
+              '<button class="xis" role="checkbox" aria-checked="' + nf + '" aria-label="Marcar como não feito" title="Não vai ser feito (escreva o motivo na observação)" data-x="' + x.id + '">' + (nf ? "✕" : "") + '</button></div>' +
+              '<div><div class="itx">' + esc(x.item) + '</div>' + (/link do formul/i.test(x.item) ? '<div class="linha" style="margin-top:6px"><button class="bt p" data-copia-link="1">Copiar link</button><a class="bt p" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(msgForm(c)) + '">Enviar no WhatsApp</a><span class="msg" id="lkMsg"></span></div>' : "") + (x.feito && x.feito_em ? '<div class="quando">' + (nf ? esc(x.feito_por) : 'Feito por ' + esc(x.feito_por || "")) + ' em ' + dataBR(x.feito_em) + '</div>' : "") + '</div>' +
               '<div class="tags"><span class="selo ' + (x.execucao === "api" ? "api" : "manual") + '">' + (x.execucao === "api" ? "API" : "Manual") + '</span><span class="selo manual">' + esc(x.quem) + '</span></div>' +
               '<input class="obs" data-o="' + x.id + '" value="' + esc(x.observacao || "") + '" placeholder="Observação (o motivo, se não fizer)"></div>';
           }).join("") + '</div>';
         }).join("") : '<div class="vazio">Checklist vazio. Marque o tipo do cliente na ficha e salve para gerar.</div>');
       corpo.querySelectorAll('input[name="filtro"]').forEach(function(x){ x.onchange = function(){ est.filtro = x.value; abaChecklist(c); }; });
       corpo.querySelectorAll("[data-t]").forEach(function(b){ b.onclick = function(){
-        var it = itens.filter(function(x){ return x.id === b.dataset.t; })[0], novo = !it.feito; b.disabled = true;
-        sb.from("checklist_cliente").update({feito:novo, feito_em:novo ? new Date().toISOString() : null, feito_por:novo ? autor() : null}).eq("id", it.id).then(function(u){
-          if(u.error){ b.disabled = false; alertaErro(u.error); return; }
-          var pr = est.progresso[c.id] = est.progresso[c.id] || {f:0, t:itens.length}; pr.f += novo ? 1 : -1; abaChecklist(c);
-        });
+        var it = itens.filter(function(x){ return x.id === b.dataset.t; })[0], novo = naoFeito(it) || !it.feito; b.disabled = true;
+        marcarItem(it, novo, novo ? autor() : null, b);
       }; });
+      corpo.querySelectorAll("[data-x]").forEach(function(b){ b.onclick = function(){
+        var it = itens.filter(function(x){ return x.id === b.dataset.x; })[0], novo = !naoFeito(it); b.disabled = true;
+        marcarItem(it, novo, novo ? "Não feito, marcado por " + autor() : null, b);
+        if(novo && !(it.observacao || "").trim()){ var o = corpo.querySelector('[data-o="' + it.id + '"]'); if(o) setTimeout(function(){ var o2 = $("corpo").querySelector('[data-o="' + it.id + '"]'); if(o2){ o2.focus(); o2.placeholder = "Escreva aqui o motivo de não fazer"; } }, 600); }
+      }; });
+      function marcarItem(it, feito, por, b){
+        var antes = !!it.feito;
+        sb.from("checklist_cliente").update({feito:feito, feito_em:feito ? new Date().toISOString() : null, feito_por:por}).eq("id", it.id).then(function(u){
+          if(u.error){ b.disabled = false; alertaErro(u.error); return; }
+          var pr = est.progresso[c.id] = est.progresso[c.id] || {f:0, t:itens.length}; pr.f += (feito ? 1 : 0) - (antes ? 1 : 0); abaChecklist(c);
+        });
+      }
       corpo.querySelectorAll("[data-copia-link]").forEach(function(b){ b.onclick = function(){ copiar(linkForm(c), $("lkMsg"), "Link copiado"); }; });
       corpo.querySelectorAll("[data-o]").forEach(function(inp){ inp.onchange = function(){ sb.from("checklist_cliente").update({observacao:inp.value.trim() || null}).eq("id", inp.dataset.o).then(function(u){ inp.style.borderColor = u.error ? "var(--al)" : "var(--ok)"; }); }; });
       $("bClaude").onclick = function(){

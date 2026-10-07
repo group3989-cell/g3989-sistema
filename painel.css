@@ -204,3 +204,11 @@ details.sub>summary small{color:var(--tx3);font-weight:500;font-size:11px}
 .pessoaDia.sel{border-color:var(--ciano)}
 .pessoaDia .prog{margin-top:6px}
 .quem{color:var(--ciano);font-weight:600}
+
+/* checklist: ✓ feito e ✕ não vai ser feito */
+.marcas{display:flex;flex-direction:column;gap:5px}
+.xis{width:20px;height:20px;border-radius:5px;border:1.5px solid var(--linha2);background:none;padding:0;display:grid;place-items:center;color:#fff;font-size:11px;opacity:.55}
+.xis:hover{opacity:1}
+.xis[aria-checked="true"]{background:#C2410C;border-color:#C2410C;opacity:1}
+.item.naofeito{border-color:rgba(194,65,12,.4)}
+.item.naofeito .itx{text-decoration:line-through;color:var(--tx3)}
