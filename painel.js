@@ -28,7 +28,10 @@
   function rotStatus(s){ for(var i = 0; i < STATUS.length; i++) if(STATUS[i][0] === s) return STATUS[i][1]; return s; }
   function rotTipos(t){ return (t || []).map(function(k){ for(var i = 0; i < TIPOS.length; i++) if(TIPOS[i][0] === k) return TIPOS[i][1]; return k; }).join(", "); }
   function dataBR(iso){ if(!iso) return ""; var d = new Date(iso); return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"}); }
-  function autor(){ var e = est.sessao && est.sessao.user && est.sessao.user.email; return e === C.email ? "Thiago" : (e || "Equipe"); }
+  function autor(){ var e = est.sessao && est.sessao.user && est.sessao.user.email; return e === C.email ? "Thiago" : (est.membro || e || "Equipe"); }
+  /* quem entrou: o Thiago (admin) vê tudo; quem está na tabela equipe vê só as próprias tarefas */
+  function papel(){ var e = String(est.sessao.user.email || "").toLowerCase(); est.membro = null; if(e === String(C.email).toLowerCase()) return Promise.resolve();
+    return sb.from("equipe").select("nome").eq("email", e).maybeSingle().then(function(r){ est.membro = r && r.data ? r.data.nome : null; }, function(){}); }
   function linkForm(c){ var base = location.origin + location.pathname.replace(/index\.html$/, ""); if(!/\/$/.test(base)) base += "/"; return base + "cadastro/?t=" + c.token_formulario; }
   /* mensagem pronta para mandar o formulário ao cliente pelo WhatsApp */
   function msgForm(c){ return "Olá" + (c.responsavel ? ", " + c.responsavel.split(" ")[0] : "") + "! Para começarmos com segurança, preencha o cadastro da " + c.nome + " neste link. Leva uns 5 minutos e não pede nenhuma senha: " + linkForm(c); }
@@ -42,7 +45,7 @@
   sb.auth.getSession().then(function(r){ est.sessao = r.data.session; inicio(); });
   sb.auth.onAuthStateChange(function(_, s){ var antes = !!est.sessao; est.sessao = s; if(antes !== !!s) inicio(); });
 
-  function inicio(){ if(!est.sessao) return telaLogin(); carregar().then(function(){ est.atualizadoEm = new Date(); render(); }); }
+  function inicio(){ if(!est.sessao) return telaLogin(); papel().then(carregar).then(function(){ est.atualizadoEm = new Date(); if(est.membro) est.view = "hoje"; render(); }); }
 
   function telaLogin(){
     app.innerHTML = '<div class="login"><form id="fLogin"><img src="assets/logo-azul.png" alt="GROUP3989"><h1>Sistema G3989</h1><p>Acesso da equipe</p>' +
@@ -61,6 +64,9 @@
 
   /* ---------- dados ---------- */
   function carregar(){
+    if(est.membro) return sb.from("tarefas").select("*").order("prioridade").order("grupo").order("ordem").order("criado_em").then(function(r){
+      est.tarefas = r.error ? null : (r.data || []); est.clientes = []; est.progresso = {}; est.fech = []; est.metaRel = [];
+    });
     return Promise.all([
       sb.from("clientes").select("*").order("nome"),
       sb.from("checklist_cliente").select("cliente_id,feito"),
@@ -89,6 +95,7 @@
   document.addEventListener("keydown", function(e){ var a = e.target; if((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) && est.sessao){ e.preventDefault(); atualizar(); } });
   document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible" && est.sessao && (!est.atualizadoEm || Date.now() - est.atualizadoEm > 60000)) atualizar(); });
   function render(){
+    if(est.membro) return renderEquipe();
     var lista = est.clientes.filter(function(c){ return !est.busca || (c.nome + " " + (c.razao_social || "")).toLowerCase().indexOf(est.busca.toLowerCase()) >= 0; });
     app.innerHTML = '<div class="app' + (est.min ? " min" : "") + '"><aside class="lado">' +
       '<div class="marca"><img src="assets/logo-branca.png" alt="GROUP3989"><div><b>Sistema G3989</b><small>Gestão interna</small></div><button class="rec" id="bMin" title="Minimizar barra" aria-label="Minimizar barra">' + (est.min ? "›" : "‹") + '</button></div>' +
@@ -133,6 +140,27 @@
 
 
 
+  /* casca de quem é da equipe: só a tela Hoje com as próprias tarefas */
+  function renderEquipe(){
+    app.innerHTML = '<div class="app' + (est.min ? " min" : "") + '"><aside class="lado">' +
+      '<div class="marca"><img src="assets/logo-branca.png" alt="GROUP3989"><div><b>Sistema G3989</b><small>' + esc(est.membro) + '</small></div><button class="rec" id="bMin" title="Minimizar barra" aria-label="Minimizar barra">' + (est.min ? "›" : "‹") + '</button></div>' +
+      '<div class="lista"><div class="rot" style="padding:6px 8px">Menu</div><button class="cli" aria-current="true"><span class="ini">✓</span><span class="tx"><span class="nm">Minhas tarefas</span><span class="mt">' + (est.tarefas ? est.tarefas.filter(function(t){ return !t.feito; }).length + ' abertas' : '') + '</span></span></button>' +
+      '<button class="cli" id="bSenha"><span class="ini">🔑</span><span class="tx"><span class="nm">Trocar minha senha</span></span></button></div>' +
+      '<div class="pe"><button class="sair" id="bSair">⎋ <span>Sair (' + esc(est.membro) + ')</span></button><span style="flex:1"></span><button class="tema" id="bTema" title="Trocar tema claro ou escuro">' + rotTema() + '</button></div></aside>' +
+      '<main id="main"></main></div>' +
+      '<button class="bt pri" id="bAtualizar" title="Atualizar (R)" style="position:fixed;right:16px;bottom:16px;z-index:9;box-shadow:0 10px 24px -10px rgba(0,0,0,.5)">↻ Atualizar</button>';
+    $("bMin").onclick = function(){ est.min = !est.min; try { localStorage.setItem("g3989:lado-min", est.min ? "1" : "0"); } catch(e){} render(); };
+    $("bSair").onclick = function(){ sb.auth.signOut(); };
+    $("bAtualizar").onclick = atualizar;
+    $("bTema").onclick = trocarTema;
+    $("bSenha").onclick = function(){
+      var n = prompt("Nova senha (mínimo 8 caracteres):"); if(!n) return;
+      if(n.length < 8) return alert("A senha precisa ter pelo menos 8 caracteres.");
+      sb.auth.updateUser({password:n}).then(function(r){ alert(r.error ? erroMsg(r.error) : "Senha trocada."); });
+    };
+    est.view = "hoje"; telaHoje();
+  }
+
   /* ---------- Hoje: tarefas que o Claude cria e o Thiago marca ---------- */
   function diaLocal(mais){ var d = new Date(); d.setDate(d.getDate() + mais); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   /* seções da tela Hoje: urgentes no topo, depois atrasadas, hoje e o futuro; dentro de cada uma, a ordem que o Thiago arrastou e depois o prazo */
@@ -160,7 +188,16 @@
     var hoje = diaLocal(0);
     if(!est.filtroHoje){ try { est.filtroHoje = localStorage.getItem("g3989:hoje-filtro") || "tudo"; } catch(e){ est.filtroHoje = "tudo"; } }
     var filtro = est.filtroHoje, aberto = lerAbertos();
-    var passa = function(t){ return filtro === "tudo" || (filtro === "pessoal" ? ehPessoal(t) : !ehPessoal(t)); };
+    var resp = function(t){ return t.responsavel || "Thiago"; };
+    var pessoas = ["Thiago", "Willian"]; T.forEach(function(t){ if(pessoas.indexOf(resp(t)) < 0) pessoas.push(resp(t)); });
+    if(est.membro) pessoas = [est.membro];
+    var pessoa = est.membro || est.pessoaHoje || "todos";
+    var passa = function(t){ return (pessoa === "todos" || resp(t) === pessoa) && (filtro === "tudo" || (filtro === "pessoal" ? ehPessoal(t) : !ehPessoal(t))); };
+    var doDia = function(t){ return t.prioridade === 1 || (t.prazo && t.prazo <= hoje); };
+    var barras = pessoas.map(function(n){
+      var ab = T.filter(function(t){ return !t.feito && resp(t) === n && doDia(t); }).length, fe = T.filter(function(t){ return t.feito && resp(t) === n && String(t.feito_em || "").slice(0, 10) === hoje; }).length, tt = ab + fe, pp = tt ? Math.round(100 * fe / tt) : 0;
+      return '<div class="pessoaDia' + (pessoa === n ? " sel" : "") + '"' + (est.membro ? "" : ' data-pessoa="' + esc(n) + '"') + '><div class="linha"><b>' + esc(n) + '</b><span style="flex:1"></span><span class="msg">' + ab + ' abertas no dia · ' + fe + ' feitas</span></div><div class="prog"><span style="width:' + pp + '%"></span></div></div>';
+    }).join("");
     var abertas = T.filter(function(t){ return !t.feito && passa(t); }), feitasHoje = T.filter(function(t){ return t.feito && passa(t) && String(t.feito_em || "").slice(0, 10) === hoje; });
     function chave(t){ return (t.feito ? "1" : "0") + String(t.ordem || 0).padStart(4, "0") + (t.prazo || "9999-12-31") + t.prioridade; }
     var vis = abertas.slice().sort(function(a, b){ return chave(a).localeCompare(chave(b)); });
@@ -169,7 +206,7 @@
     var urg = abertas.filter(function(t){ return t.prioridade === 1; }).length, atrasadas = abertas.filter(function(t){ return t.prioridade !== 1 && t.prazo && t.prazo < hoje; }).length, deHoje = abertas.filter(function(t){ return t.prioridade !== 1 && t.prazo === hoje; }).length;
     var tot = abertas.length + feitasHoje.length, p = tot ? Math.round(100 * feitasHoje.length / tot) : 0;
     var dataTxt = new Date().toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long"});
-    var nP = T.filter(function(t){ return !t.feito && ehPessoal(t); }).length, nE = T.filter(function(t){ return !t.feito && !ehPessoal(t); }).length;
+    var nP = T.filter(function(t){ return !t.feito && ehPessoal(t) && (pessoa === "todos" || resp(t) === pessoa); }).length, nE = T.filter(function(t){ return !t.feito && !ehPessoal(t) && (pessoa === "todos" || resp(t) === pessoa); }).length;
     function chip(v, rot, n){ return '<button class="chipf" data-filtro="' + v + '" aria-pressed="' + (filtro === v) + '">' + rot + ' <small>' + n + '</small></button>'; }
     function abertoPadrao(k){ return k === "urg" || k === "atr" || k === hoje; }
     function itemHTML(t){
@@ -178,6 +215,7 @@
         '<div class="g2"><div class="campo"><label>Tarefa</label><input name="texto" value="' + esc(t.texto) + '" required></div><div class="campo"><label>Grupo</label><input name="grupo" value="' + esc(t.grupo) + '" list="gruposT"></div></div>' +
         '<div class="campo"><label>Detalhe</label><input name="detalhe" value="' + esc(t.detalhe || "") + '"></div>' +
         '<div class="campo"><label>Observação ou motivo de não ter feito</label><input name="observacao" value="' + esc(t.observacao || "") + '"></div>' +
+        (est.membro ? "" : '<div class="campo"><label>Responsável</label><select name="responsavel">' + pessoas.map(function(n){ return '<option' + (resp(t) === n ? " selected" : "") + '>' + esc(n) + '</option>'; }).join("") + '</select></div>') +
         '<div class="g2"><div class="campo"><label>Prazo</label><input name="prazo" type="date" value="' + esc(t.prazo || "") + '"></div><div class="campo"><label>Prioridade</label><select name="prioridade"><option value="1"' + (t.prioridade === 1 ? " selected" : "") + '>Urgente</option><option value="2"' + (t.prioridade === 2 ? " selected" : "") + '>Normal</option><option value="3"' + (t.prioridade === 3 ? " selected" : "") + '>Sem pressa</option></select></div></div>' +
         '<div class="quando">' + esc(/^virada:/.test(t.origem || "") ? "Veio da Virada" : "Criada por " + (t.criado_por || "")) + '</div>' +
         '<div class="linha"><button class="bt pri p" type="submit">Salvar</button><button class="bt p" type="button" data-cancela="1">Cancelar</button><span style="flex:1"></span><button class="bt p perigo" type="button" data-apaga="' + t.id + '">Excluir tarefa</button></div></form>';
@@ -185,7 +223,7 @@
       var quando = t.prazo ? (atras ? "atrasada, " : t.prazo === hoje ? "hoje, " : "") + t.prazo.split("-").reverse().slice(0, 2).join("/") : "sem prazo";
       return '<div class="item arrastavel compacto" data-id="' + t.id + '"><div class="pega"><span class="alca" title="Arraste para mudar a ordem ou o prazo" aria-label="Arrastar">⋮⋮</span><button class="tick" role="checkbox" aria-checked="false" aria-label="Marcar como feita" data-tf="' + t.id + '"></button></div>' +
         '<div><div class="itx">' + esc(t.texto) + '</div>' +
-        '<div class="quando"><span' + (atras ? ' style="color:var(--al)"' : "") + '>' + esc(quando) + '</span>' + (cli ? ' · <button class="lk" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + (t.detalhe ? ' · ' + esc(t.detalhe) : "") + (t.observacao ? ' · <i>' + esc(t.observacao) + '</i>' : "") + '</div></div>' +
+        '<div class="quando"><span' + (atras ? ' style="color:var(--al)"' : "") + '>' + esc(quando) + '</span>' + (!est.membro && resp(t) !== "Thiago" ? ' · <b class="quem">' + esc(resp(t)) + '</b>' : "") + (cli ? ' · <button class="lk" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + (t.detalhe ? ' · ' + esc(t.detalhe) : "") + (t.observacao ? ' · <i>' + esc(t.observacao) + '</i>' : "") + '</div></div>' +
         '<div class="tags"><button class="selo manual" style="border:0;cursor:pointer" data-edita="' + t.id + '" title="Editar, mudar prazo, prioridade ou observação">✎</button></div></div>';
     }
     function corpoSecao(sec){
@@ -199,16 +237,17 @@
     }
     $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>Hoje</h2></div><span class="esp"></span>' +
       '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "← Voltar para as abertas" : "Feitas (" + T.filter(function(t){ return t.feito; }).length + ")") + '</button><button class="bt p" id="bNova">+ Nova</button><button class="bt p pri" id="bClaudeHoje">Copiar para o Claude</button><span id="hMsg" class="msg"></span></div>' +
-      '<div class="conteudo"><div class="cx"><div class="linha" style="gap:6px">' + chip("tudo", "Tudo", nP + nE) + chip("empresa", "Empresa", nE) + chip("pessoal", "Pessoal", nP) + '</div>' +
+      '<div class="conteudo"><div class="cx"><div class="equipeDia">' + barras + '</div>' + (est.membro ? "" : '<div class="linha" style="gap:6px;margin-top:10px"><button class="chipf" data-pessoa="todos" aria-pressed="' + (pessoa === "todos") + '">Todos</button>' + pessoas.map(function(n){ return '<button class="chipf" data-pessoa="' + esc(n) + '" aria-pressed="' + (pessoa === n) + '">' + esc(n) + '</button>'; }).join("") + '<span style="width:12px"></span>' + chip("tudo", "Tudo", nP + nE) + chip("empresa", "Empresa", nE) + chip("pessoal", "Pessoal", nP) + '</div>') +
       '<div class="resumoHoje">' + (urg ? '<span class="r al">' + urg + ' urgentes</span>' : "") + (atrasadas ? '<span class="r al">' + atrasadas + ' atrasadas</span>' : "") + '<span class="r ci">' + deHoje + ' para hoje</span><span class="r">' + feitasHoje.length + ' feitas hoje</span><span class="r">' + abertas.length + ' abertas</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
       '<form class="linha" id="fTarefa" style="margin-top:12px' + (est.novaAberta ? "" : ";display:none") + '"><input class="busca" id="tTexto" style="margin:0;flex:2 1 240px" placeholder="Nova tarefa" required><input class="busca" id="tGrupo" style="margin:0;flex:1 1 140px" placeholder="Grupo (ex.: Trendyce ou Pessoal)" list="gruposT"><datalist id="gruposT">' + grupos.map(function(g){ return '<option value="' + esc(g) + '">'; }).join("") + '</datalist>' +
-      '<input class="busca" id="tPrazo" type="date" style="margin:0;width:auto" value="' + hoje + '" title="Prazo"><select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select><button class="bt pri" type="submit">Adicionar</button></form></div>' +
+      '<input class="busca" id="tPrazo" type="date" style="margin:0;width:auto" value="' + hoje + '" title="Prazo"><select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select>' + (est.membro ? "" : '<select class="busca" id="tResp" style="margin:0;width:auto" title="Responsável">' + pessoas.map(function(n){ return '<option' + ((pessoa === "todos" ? "Thiago" : pessoa) === n ? " selected" : "") + '>' + esc(n) + '</option>'; }).join("") + '</select>') + '<button class="bt pri" type="submit">Adicionar</button></form></div>' +
       (vis.length ? secoes.map(function(sec){
         var ab = aberto[sec.k] !== undefined ? aberto[sec.k] : abertoPadrao(sec.k);
         return '<details class="bloco secao" data-ab="' + esc(sec.k) + '"' + (ab ? " open" : "") + '><summary><h4' + (sec.cor ? ' style="color:var(--' + sec.cor + ')"' : "") + '>' + esc(sec.titulo) + ' <small>' + sec.itens.length + '</small></h4></summary>' + corpoSecao(sec) + '</details>';
       }).join("") : '<div class="vazio">Nenhuma tarefa aberta' + (filtro !== "tudo" ? " neste filtro" : "") + '.</div>') + '</div>';
     document.querySelectorAll("details[data-ab]").forEach(function(d){ d.addEventListener("toggle", function(){ var m = lerAbertos(); m[d.dataset.ab] = d.open; gravarAbertos(m); }); });
     document.querySelectorAll("[data-filtro]").forEach(function(b){ b.onclick = function(){ est.filtroHoje = b.dataset.filtro; try { localStorage.setItem("g3989:hoje-filtro", est.filtroHoje); } catch(e){} telaHoje(); }; });
+    document.querySelectorAll("[data-pessoa]").forEach(function(b){ b.onclick = function(){ est.pessoaHoje = b.dataset.pessoa; telaHoje(); }; });
     $("bNova").onclick = function(){ est.novaAberta = !est.novaAberta; telaHoje(); if(est.novaAberta) $("tTexto").focus(); };
     $("bVerFeitas").onclick = function(){ est.verFeitas = !est.verFeitas; telaHoje(); };
     ligarArrastar(T);
@@ -233,6 +272,7 @@
       ev.preventDefault();
       var t = T.filter(function(x){ return x.id === f.dataset.fe; })[0], el = f.elements;
       var u = {texto:el.texto.value.trim(), grupo:el.grupo.value.trim() || "Geral", detalhe:el.detalhe.value.trim() || null, observacao:el.observacao.value.trim() || null, prazo:el.prazo.value || null, prioridade:+el.prioridade.value, editado:true};
+      if(el.responsavel) u.responsavel = el.responsavel.value;
       sb.from("tarefas").update(u).eq("id", t.id).then(function(r){ if(r.error) return alertaErro(r.error); Object.assign(t, u); est.editT = null; telaHoje(); });
     }; });
     document.querySelectorAll("[data-to]").forEach(function(inp){ inp.onchange = function(){
@@ -242,13 +282,14 @@
     $("fTarefa").onsubmit = function(ev){
       ev.preventDefault();
       var d = {texto:$("tTexto").value.trim(), grupo:$("tGrupo").value.trim() || "Geral", prioridade:+$("tPri").value, prazo:$("tPrazo").value || null, criado_por:autor()};
+      if(est.membro) d.responsavel = est.membro; else if($("tResp")) d.responsavel = $("tResp").value;
       sb.from("tarefas").insert(d).select().single().then(function(r){ if(r.error) return alertaErro(r.error); T.push(r.data); render(); });
     };
     $("bClaudeHoje").onclick = function(){
       var feitas = T.filter(function(t){ return t.feito && String(t.feito_em || "").slice(0, 10) === hoje; }), L = ["Claude, situação das tarefas de hoje no Sistema G3989:", "", "FEITAS HOJE (" + feitas.length + "):"];
       feitas.forEach(function(t){ L.push("- " + t.texto + (t.observacao ? " (obs.: " + t.observacao + ")" : "")); });
       L.push("", "ABERTAS (" + abertas.length + "):");
-      abertas.slice().sort(function(a, b){ return chave(a).localeCompare(chave(b)); }).forEach(function(t){ L.push("- " + (t.prazo ? t.prazo.split("-").reverse().slice(0, 2).join("/") + " " : "sem prazo ") + "[" + t.grupo + "] " + t.texto + (t.observacao ? " | motivo: " + t.observacao : "")); });
+      abertas.slice().sort(function(a, b){ return chave(a).localeCompare(chave(b)); }).forEach(function(t){ L.push("- " + (t.prazo ? t.prazo.split("-").reverse().slice(0, 2).join("/") + " " : "sem prazo ") + "[" + t.grupo + (t.responsavel && t.responsavel !== "Thiago" ? " · " + t.responsavel : "") + "] " + t.texto + (t.observacao ? " | motivo: " + t.observacao : "")); });
       L.push("", "Lê a tabela de tarefas no Supabase, registra o que precisa e me diz o próximo passo de cada aberta.");
       copiar(L.join("\n"), $("hMsg"), "Copiado. Cole no chat do Claude.");
     };

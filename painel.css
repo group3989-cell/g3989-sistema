@@ -198,3 +198,9 @@ details.sub>summary small{color:var(--tx3);font-weight:500;font-size:11px}
 .item.compacto .itx{font-size:14px;line-height:1.35}
 .lk{border:0;background:none;color:var(--ciano);font:inherit;padding:0;cursor:pointer}
 @media(max-width:600px){.item.arrastavel.compacto{grid-template-columns:46px minmax(0,1fr) auto}.item.arrastavel.compacto .tags{grid-column:auto}}
+/* delegação: barra do dia por pessoa */
+.equipeDia{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.pessoaDia{border:1px solid var(--linha);border-radius:var(--rs);padding:8px 10px;background:var(--sutil);cursor:pointer}
+.pessoaDia.sel{border-color:var(--ciano)}
+.pessoaDia .prog{margin-top:6px}
+.quem{color:var(--ciano);font-weight:600}
