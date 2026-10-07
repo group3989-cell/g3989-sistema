@@ -176,3 +176,25 @@ button{cursor:pointer}
 .fantasma{opacity:.4;border-style:dashed}
 .arrasta{min-height:8px}
 @media(max-width:600px){.item.arrastavel{grid-template-columns:52px minmax(0,1fr)}.item.arrastavel .tags{grid-column:2}.item.arrastavel .obs{grid-column:1/3}}
+/* Hoje compacto: filtro Tudo/Empresa/Pessoal, seções e grupos recolhíveis */
+.chipf{border:1px solid var(--linha2);background:var(--btbg);color:var(--tx2);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.chipf small{color:var(--tx3);font-size:11px;margin-left:2px}
+.chipf[aria-pressed="true"]{background:var(--ciano-s);border-color:var(--ciano);color:var(--tx)}
+.resumoHoje{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
+.resumoHoje .r{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--neutro);color:var(--tx2)}
+.resumoHoje .r.al{background:var(--al-s);color:var(--al);font-weight:600}
+.resumoHoje .r.ci{background:var(--ciano-s);color:var(--ciano);font-weight:600}
+details.secao>summary,details.sub>summary{list-style:none;cursor:pointer;user-select:none}
+details.secao>summary::-webkit-details-marker,details.sub>summary::-webkit-details-marker{display:none}
+details.secao>summary h4::before{content:"▸";display:inline-block;width:12px;color:var(--tx3);transition:transform .15s}
+details.secao[open]>summary h4::before{transform:rotate(90deg)}
+details.secao>summary h4{margin-bottom:8px}
+details.sub{margin:0 0 6px 12px;border-left:2px solid var(--linha2);padding-left:10px}
+details.sub>summary{font-size:13px;font-weight:600;color:var(--tx2);padding:6px 0}
+details.sub>summary::before{content:"▸ ";color:var(--tx3)}
+details.sub[open]>summary::before{content:"▾ "}
+details.sub>summary small{color:var(--tx3);font-weight:500;font-size:11px}
+.item.compacto{padding:7px 9px;margin-bottom:5px}
+.item.compacto .itx{font-size:14px;line-height:1.35}
+.lk{border:0;background:none;color:var(--ciano);font:inherit;padding:0;cursor:pointer}
+@media(max-width:600px){.item.arrastavel.compacto{grid-template-columns:46px minmax(0,1fr) auto}.item.arrastavel.compacto .tags{grid-column:auto}}

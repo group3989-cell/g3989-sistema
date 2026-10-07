@@ -135,7 +135,7 @@
 
   /* ---------- Hoje: tarefas que o Claude cria e o Thiago marca ---------- */
   function diaLocal(mais){ var d = new Date(); d.setDate(d.getDate() + mais); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
-  /* seções da tela Hoje: urgentes no topo, depois por data; dentro de cada uma, a ordem que o Thiago arrastou e depois o prazo */
+  /* seções da tela Hoje: urgentes no topo, depois atrasadas, hoje e o futuro; dentro de cada uma, a ordem que o Thiago arrastou e depois o prazo */
   function secoesHoje(abertas){
     var hoje = diaLocal(0), amanha = diaLocal(1), limite = diaLocal(7), S = [];
     function add(k, titulo, filtro, cor){ var L = abertas.filter(filtro); S.push({k:k, titulo:titulo, itens:L, cor:cor}); }
@@ -145,44 +145,71 @@
     add("atr", "Atrasadas", function(t){ return resto(t) && t.prazo && t.prazo < hoje; }, "al");
     add(hoje, "Hoje", function(t){ return resto(t) && t.prazo === hoje; }, "ciano");
     add(amanha, "Amanhã", function(t){ return resto(t) && t.prazo === amanha; });
-    for(var i = 2; i <= 7; i++){ (function(d){ var dd = new Date(d + "T12:00:00"); add(d, dd.toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"2-digit"}), function(t){ return resto(t) && t.prazo === d; }); })(diaLocal(i)); }
+    add("sem7", "Próximos 7 dias", function(t){ return resto(t) && t.prazo && t.prazo > amanha && t.prazo <= limite; });
     add("dep", "Mais pra frente", function(t){ return resto(t) && t.prazo && t.prazo > limite; });
     add("sem", "Sem prazo", function(t){ return resto(t) && !t.prazo; });
     S.forEach(function(x){ x.itens.sort(ord); });
     return S.filter(function(x){ return x.itens.length; });
   }
+  function ehPessoal(t){ return /^pessoal$/i.test(String(t.grupo || "").trim()); }
+  function lerAbertos(){ try { return JSON.parse(localStorage.getItem("g3989:hoje-abertos") || "{}"); } catch(e){ return {}; } }
+  function gravarAbertos(m){ try { localStorage.setItem("g3989:hoje-abertos", JSON.stringify(m)); } catch(e){} }
   function telaHoje(){
     var T = est.tarefas;
     if(T === null){ $("main").innerHTML = '<div class="topo"><div><div class="mig">GROUP3989</div><h2>Hoje</h2></div></div><div class="conteudo"><div class="vazio">A tabela de tarefas ainda não existe. Rode o SQL 004 no Supabase.</div></div>'; return; }
     var hoje = diaLocal(0);
-    var abertas = T.filter(function(t){ return !t.feito; }), feitasHoje = T.filter(function(t){ return t.feito && String(t.feito_em || "").slice(0, 10) === hoje; });
+    if(!est.filtroHoje){ try { est.filtroHoje = localStorage.getItem("g3989:hoje-filtro") || "tudo"; } catch(e){ est.filtroHoje = "tudo"; } }
+    var filtro = est.filtroHoje, aberto = lerAbertos();
+    var passa = function(t){ return filtro === "tudo" || (filtro === "pessoal" ? ehPessoal(t) : !ehPessoal(t)); };
+    var abertas = T.filter(function(t){ return !t.feito && passa(t); }), feitasHoje = T.filter(function(t){ return t.feito && passa(t) && String(t.feito_em || "").slice(0, 10) === hoje; });
     function chave(t){ return (t.feito ? "1" : "0") + String(t.ordem || 0).padStart(4, "0") + (t.prazo || "9999-12-31") + t.prioridade; }
-    var vis = T.filter(function(t){ return !t.feito; }).sort(function(a, b){ return chave(a).localeCompare(chave(b)); });
-    var grupos = []; vis.forEach(function(t){ if(grupos.indexOf(t.grupo) < 0) grupos.push(t.grupo); });
+    var vis = abertas.slice().sort(function(a, b){ return chave(a).localeCompare(chave(b)); });
+    var grupos = []; T.forEach(function(t){ if(grupos.indexOf(t.grupo) < 0) grupos.push(t.grupo); });
     var secoes = secoesHoje(vis);
-    var atrasadas = abertas.filter(function(t){ return t.prazo && t.prazo < hoje; }).length, deHoje = abertas.filter(function(t){ return t.prazo === hoje; }).length;
+    var urg = abertas.filter(function(t){ return t.prioridade === 1; }).length, atrasadas = abertas.filter(function(t){ return t.prioridade !== 1 && t.prazo && t.prazo < hoje; }).length, deHoje = abertas.filter(function(t){ return t.prioridade !== 1 && t.prazo === hoje; }).length;
     var tot = abertas.length + feitasHoje.length, p = tot ? Math.round(100 * feitasHoje.length / tot) : 0;
     var dataTxt = new Date().toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long"});
+    var nP = T.filter(function(t){ return !t.feito && ehPessoal(t); }).length, nE = T.filter(function(t){ return !t.feito && !ehPessoal(t); }).length;
+    function chip(v, rot, n){ return '<button class="chipf" data-filtro="' + v + '" aria-pressed="' + (filtro === v) + '">' + rot + ' <small>' + n + '</small></button>'; }
+    function abertoPadrao(k){ return k === "urg" || k === "atr" || k === hoje; }
+    function itemHTML(t){
+      var cli = t.cliente_id ? cliPorId(t.cliente_id) : null;
+      if(est.editT === t.id) return '<form class="item" data-fe="' + t.id + '" style="grid-template-columns:1fr;gap:8px">' +
+        '<div class="g2"><div class="campo"><label>Tarefa</label><input name="texto" value="' + esc(t.texto) + '" required></div><div class="campo"><label>Grupo</label><input name="grupo" value="' + esc(t.grupo) + '" list="gruposT"></div></div>' +
+        '<div class="campo"><label>Detalhe</label><input name="detalhe" value="' + esc(t.detalhe || "") + '"></div>' +
+        '<div class="campo"><label>Observação ou motivo de não ter feito</label><input name="observacao" value="' + esc(t.observacao || "") + '"></div>' +
+        '<div class="g2"><div class="campo"><label>Prazo</label><input name="prazo" type="date" value="' + esc(t.prazo || "") + '"></div><div class="campo"><label>Prioridade</label><select name="prioridade"><option value="1"' + (t.prioridade === 1 ? " selected" : "") + '>Urgente</option><option value="2"' + (t.prioridade === 2 ? " selected" : "") + '>Normal</option><option value="3"' + (t.prioridade === 3 ? " selected" : "") + '>Sem pressa</option></select></div></div>' +
+        '<div class="quando">' + esc(/^virada:/.test(t.origem || "") ? "Veio da Virada" : "Criada por " + (t.criado_por || "")) + '</div>' +
+        '<div class="linha"><button class="bt pri p" type="submit">Salvar</button><button class="bt p" type="button" data-cancela="1">Cancelar</button><span style="flex:1"></span><button class="bt p perigo" type="button" data-apaga="' + t.id + '">Excluir tarefa</button></div></form>';
+      var atras = t.prazo && t.prazo < hoje;
+      var quando = t.prazo ? (atras ? "atrasada, " : t.prazo === hoje ? "hoje, " : "") + t.prazo.split("-").reverse().slice(0, 2).join("/") : "sem prazo";
+      return '<div class="item arrastavel compacto" data-id="' + t.id + '"><div class="pega"><span class="alca" title="Arraste para mudar a ordem ou o prazo" aria-label="Arrastar">⋮⋮</span><button class="tick" role="checkbox" aria-checked="false" aria-label="Marcar como feita" data-tf="' + t.id + '"></button></div>' +
+        '<div><div class="itx">' + esc(t.texto) + '</div>' +
+        '<div class="quando"><span' + (atras ? ' style="color:var(--al)"' : "") + '>' + esc(quando) + '</span>' + (cli ? ' · <button class="lk" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + (t.detalhe ? ' · ' + esc(t.detalhe) : "") + (t.observacao ? ' · <i>' + esc(t.observacao) + '</i>' : "") + '</div></div>' +
+        '<div class="tags"><button class="selo manual" style="border:0;cursor:pointer" data-edita="' + t.id + '" title="Editar, mudar prazo, prioridade ou observação">✎</button></div></div>';
+    }
+    function corpoSecao(sec){
+      var porG = {}, ordemG = [];
+      sec.itens.forEach(function(t){ if(!porG[t.grupo]){ porG[t.grupo] = []; ordemG.push(t.grupo); } porG[t.grupo].push(t); });
+      if(ordemG.length <= 1 || sec.itens.length <= 4) return '<div class="arrasta" data-secao="' + esc(sec.k) + '">' + sec.itens.map(itemHTML).join("") + '</div>';
+      return ordemG.map(function(g){
+        var id = sec.k + "|" + g, L = porG[g], ab = aberto[id] !== undefined ? aberto[id] : L.length <= 2;
+        return '<details class="sub" data-ab="' + esc(id) + '"' + (ab ? " open" : "") + '><summary>' + esc(g) + ' <small>' + L.length + '</small></summary><div class="arrasta" data-secao="' + esc(sec.k) + '">' + L.map(itemHTML).join("") + '</div></details>';
+      }).join("");
+    }
     $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>Hoje</h2></div><span class="esp"></span>' +
-      '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "← Voltar para as abertas" : "Histórico de feitas (" + T.filter(function(t){ return t.feito; }).length + ")") + '</button><button class="bt p pri" id="bClaudeHoje">Copiar situação para o Claude</button><span id="hMsg" class="msg"></span></div>' +
-      '<div class="conteudo"><div class="cx"><div class="linha"><h3>' + abertas.length + (abertas.length === 1 ? ' tarefa aberta' : ' tarefas abertas') + '</h3><span style="flex:1"></span><span class="msg">' + (atrasadas ? '<b style="color:var(--al)">' + atrasadas + ' atrasadas</b> · ' : "") + deHoje + ' para hoje · ' + feitasHoje.length + ' feitas hoje</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
-      '<form class="linha" id="fTarefa" style="margin-top:12px"><input class="busca" id="tTexto" style="margin:0;flex:2 1 240px" placeholder="Nova tarefa" required><input class="busca" id="tGrupo" style="margin:0;flex:1 1 140px" placeholder="Grupo (ex.: Trendyce)" list="gruposT"><datalist id="gruposT">' + grupos.map(function(g){ return '<option value="' + esc(g) + '">'; }).join("") + '</datalist>' +
+      '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "← Voltar para as abertas" : "Feitas (" + T.filter(function(t){ return t.feito; }).length + ")") + '</button><button class="bt p" id="bNova">+ Nova</button><button class="bt p pri" id="bClaudeHoje">Copiar para o Claude</button><span id="hMsg" class="msg"></span></div>' +
+      '<div class="conteudo"><div class="cx"><div class="linha" style="gap:6px">' + chip("tudo", "Tudo", nP + nE) + chip("empresa", "Empresa", nE) + chip("pessoal", "Pessoal", nP) + '</div>' +
+      '<div class="resumoHoje">' + (urg ? '<span class="r al">' + urg + ' urgentes</span>' : "") + (atrasadas ? '<span class="r al">' + atrasadas + ' atrasadas</span>' : "") + '<span class="r ci">' + deHoje + ' para hoje</span><span class="r">' + feitasHoje.length + ' feitas hoje</span><span class="r">' + abertas.length + ' abertas</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
+      '<form class="linha" id="fTarefa" style="margin-top:12px' + (est.novaAberta ? "" : ";display:none") + '"><input class="busca" id="tTexto" style="margin:0;flex:2 1 240px" placeholder="Nova tarefa" required><input class="busca" id="tGrupo" style="margin:0;flex:1 1 140px" placeholder="Grupo (ex.: Trendyce ou Pessoal)" list="gruposT"><datalist id="gruposT">' + grupos.map(function(g){ return '<option value="' + esc(g) + '">'; }).join("") + '</datalist>' +
       '<input class="busca" id="tPrazo" type="date" style="margin:0;width:auto" value="' + hoje + '" title="Prazo"><select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select><button class="bt pri" type="submit">Adicionar</button></form></div>' +
       (vis.length ? secoes.map(function(sec){
-        var L = sec.itens;
-        return '<div class="bloco"><h4' + (sec.cor ? ' style="color:var(--' + sec.cor + ')"' : "") + '>' + esc(sec.titulo.charAt(0).toUpperCase() + sec.titulo.slice(1)) + ' <small>' + L.length + '</small></h4><div class="arrasta" data-secao="' + esc(sec.k) + '">' + L.map(function(t){
-          var cli = t.cliente_id ? cliPorId(t.cliente_id) : null;
-          if(est.editT === t.id) return '<form class="item" data-fe="' + t.id + '" style="grid-template-columns:1fr;gap:8px">' +
-            '<div class="g2"><div class="campo"><label>Tarefa</label><input name="texto" value="' + esc(t.texto) + '" required></div><div class="campo"><label>Grupo</label><input name="grupo" value="' + esc(t.grupo) + '" list="gruposT"></div></div>' +
-            '<div class="campo"><label>Detalhe</label><input name="detalhe" value="' + esc(t.detalhe || "") + '"></div>' +
-            '<div class="g2"><div class="campo"><label>Prazo</label><input name="prazo" type="date" value="' + esc(t.prazo || "") + '"></div><div class="campo"><label>Prioridade</label><select name="prioridade"><option value="1"' + (t.prioridade === 1 ? " selected" : "") + '>Urgente</option><option value="2"' + (t.prioridade === 2 ? " selected" : "") + '>Normal</option><option value="3"' + (t.prioridade === 3 ? " selected" : "") + '>Sem pressa</option></select></div></div>' +
-            '<div class="linha"><button class="bt pri p" type="submit">Salvar</button><button class="bt p" type="button" data-cancela="1">Cancelar</button><span style="flex:1"></span><button class="bt p perigo" type="button" data-apaga="' + t.id + '">Excluir tarefa</button></div></form>';
-          return '<div class="item arrastavel' + (t.feito ? " feito" : "") + '" data-id="' + t.id + '"><div class="pega"><span class="alca" title="Arraste para mudar a ordem" aria-label="Arrastar">⋮⋮</span><button class="tick" role="checkbox" aria-checked="' + t.feito + '" aria-label="Marcar como feita" data-tf="' + t.id + '">' + (t.feito ? "✓" : "") + '</button></div>' +
-            '<div><div class="itx">' + esc(t.texto) + '</div>' + (t.detalhe ? '<div class="quando">' + esc(t.detalhe) + '</div>' : "") + (t.feito && t.feito_em ? '<div class="quando">Feita por ' + esc(t.feito_por || "") + ' em ' + dataBR(t.feito_em) + '</div>' : "") + '</div>' +
-            '<div class="tags"><span class="selo manual" title="Grupo">' + esc(t.grupo) + '</span>' + (t.prioridade === 1 && !t.feito ? '<span class="selo" style="background:var(--al-s);color:var(--al)">Urgente</span>' : t.prioridade === 3 ? '<span class="selo manual">Sem pressa</span>' : "") + '<label class="selo ' + (!t.feito && t.prazo && t.prazo < hoje ? '" style="background:var(--al-s);color:var(--al)' : !t.feito && t.prazo === hoje ? 'api' : 'manual') + '" title="Prazo">' + (!t.feito && t.prazo && t.prazo < hoje ? 'atrasada ' : !t.feito && t.prazo === hoje ? 'hoje ' : '') + '<input type="date" data-tp="' + t.id + '" value="' + esc(t.prazo || "") + '" style="border:0;background:transparent;color:inherit;font:inherit;padding:0;width:' + (t.prazo ? '104px' : '96px') + '"></label>' + (cli ? '<button class="selo api" style="border:0;cursor:pointer" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + '<span class="selo manual">' + esc(/^virada:/.test(t.origem || "") ? "Virada" : t.criado_por) + '</span><button class="selo manual" style="border:0;cursor:pointer" data-edita="' + t.id + '" title="Editar tarefa">✎ Editar</button></div>' +
-            '<input class="obs" data-to="' + t.id + '" value="' + esc(t.observacao || "") + '" placeholder="Observação ou motivo de não ter feito"></div>';
-        }).join("") + '</div></div>';
-      }).join("") : '<div class="vazio">Nenhuma tarefa aberta. Peça ao Claude: "monta as tarefas de hoje".</div>') + '</div>';
+        var ab = aberto[sec.k] !== undefined ? aberto[sec.k] : abertoPadrao(sec.k);
+        return '<details class="bloco secao" data-ab="' + esc(sec.k) + '"' + (ab ? " open" : "") + '><summary><h4' + (sec.cor ? ' style="color:var(--' + sec.cor + ')"' : "") + '>' + esc(sec.titulo) + ' <small>' + sec.itens.length + '</small></h4></summary>' + corpoSecao(sec) + '</details>';
+      }).join("") : '<div class="vazio">Nenhuma tarefa aberta' + (filtro !== "tudo" ? " neste filtro" : "") + '.</div>') + '</div>';
+    document.querySelectorAll("details[data-ab]").forEach(function(d){ d.addEventListener("toggle", function(){ var m = lerAbertos(); m[d.dataset.ab] = d.open; gravarAbertos(m); }); });
+    document.querySelectorAll("[data-filtro]").forEach(function(b){ b.onclick = function(){ est.filtroHoje = b.dataset.filtro; try { localStorage.setItem("g3989:hoje-filtro", est.filtroHoje); } catch(e){} telaHoje(); }; });
+    $("bNova").onclick = function(){ est.novaAberta = !est.novaAberta; telaHoje(); if(est.novaAberta) $("tTexto").focus(); };
     $("bVerFeitas").onclick = function(){ est.verFeitas = !est.verFeitas; telaHoje(); };
     ligarArrastar(T);
     if(est.verFeitas) return historicoFeitas(T);
@@ -205,7 +232,7 @@
     document.querySelectorAll("[data-fe]").forEach(function(f){ f.onsubmit = function(ev){
       ev.preventDefault();
       var t = T.filter(function(x){ return x.id === f.dataset.fe; })[0], el = f.elements;
-      var u = {texto:el.texto.value.trim(), grupo:el.grupo.value.trim() || "Geral", detalhe:el.detalhe.value.trim() || null, prazo:el.prazo.value || null, prioridade:+el.prioridade.value, editado:true};
+      var u = {texto:el.texto.value.trim(), grupo:el.grupo.value.trim() || "Geral", detalhe:el.detalhe.value.trim() || null, observacao:el.observacao.value.trim() || null, prazo:el.prazo.value || null, prioridade:+el.prioridade.value, editado:true};
       sb.from("tarefas").update(u).eq("id", t.id).then(function(r){ if(r.error) return alertaErro(r.error); Object.assign(t, u); est.editT = null; telaHoje(); });
     }; });
     document.querySelectorAll("[data-to]").forEach(function(inp){ inp.onchange = function(){
