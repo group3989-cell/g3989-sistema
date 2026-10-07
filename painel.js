@@ -27,7 +27,7 @@
   function doFormulario(c, d){
     var ids = Object.assign({}, c.ids || {}); if(d.site) ids.loja_url = d.site; if(d.instagram) ids.instagram = d.instagram;
     var f = c.formulario || {}, pre = Object.assign({}, f.preenchido || {});
-    Object.keys(d).forEach(function(k){ var v = d[k]; if(k === "consentimento" || v == null || v === "") return; pre[k] = Array.isArray(v) ? v.join(", ") : String(v); });
+    Object.keys(d).forEach(function(k){ var v = d[k]; if(k === "consentimento") return; if(v == null || v === ""){ delete pre[k]; return; } pre[k] = Array.isArray(v) ? v.join(", ") : String(v); });
     var u = {ids:ids, formulario:{preenchido:pre, ocultos:f.ocultos || []}, atualizado_em:new Date().toISOString()};
     [["razao_social","razao_social"],["cnpj","cnpj"],["responsavel","responsavel"],["segmento","segmento"],["plataforma_loja","plataforma_loja"],["erp","erp"]].forEach(function(q){ if(d[q[0]]) u[q[1]] = d[q[0]]; });
     return u;
@@ -585,9 +585,13 @@
       if(!L.length){ corpo.innerHTML = '<div class="vazio">O cliente ainda não enviou o formulário.<br>O link está na aba Ficha e IDs.</div>'; return; }
       var d = L[0].dados || {};
       corpo.innerHTML = '<div class="cx"><div class="linha"><h3>Formulário enviado</h3><span style="flex:1"></span><span class="msg">' + dataBR(L[0].enviado_em) + (L.length > 1 ? " · " + L.length + " envios" : "") + '</span></div>' +
-        '<dl class="dados" style="margin-top:14px">' + Object.keys(d).map(function(k){ var v = d[k]; if(Array.isArray(v)) v = v.join(", "); else if(v && typeof v === "object") v = JSON.stringify(v); return '<dt>' + esc(ROT_CAD[k] || k) + '</dt><dd>' + esc(v) + '</dd>'; }).join("") + '</dl>' +
-        '<div class="linha" style="margin-top:16px"><button class="bt pri" id="bAplicar">Levar para a ficha</button><span id="aMsg" class="msg"></span></div><div class="dica" style="margin-top:6px">Leva tudo para a ficha: dados da empresa, IDs (site e Instagram) e o bloco Contato e operação (endereço, telefone, e-mail, WhatsApp, horário, time, vendas). O que já estiver na ficha é trocado pelo que o cliente mandou.</div></div>';
+        '<div class="dica" style="margin-top:6px">Confira e corrija aqui mesmo. O que você editar é o que vai para a ficha.</div><div class="g3" style="margin-top:12px">' + Object.keys(d).map(function(k){ var v = d[k]; if(Array.isArray(v)) v = v.join(", "); else if(v && typeof v === "object") v = JSON.stringify(v); v = v == null ? "" : String(v);
+          var rot = '<label for="cd_' + k + '">' + esc(ROT_CAD[k] || k) + '</label>';
+          if(k === "consentimento") return '<div class="campo">' + rot + '<input id="cd_' + k + '" value="' + esc(v) + '" readonly></div>';
+          return '<div class="campo">' + rot + (v.length > 60 || v.indexOf("\n") >= 0 ? '<textarea id="cd_' + k + '" data-cd="' + k + '" rows="3">' + esc(v) + '</textarea>' : '<input id="cd_' + k + '" data-cd="' + k + '" value="' + esc(v) + '">') + '</div>'; }).join("") + '</div>' +
+        '<div class="linha" style="margin-top:16px"><button class="bt pri" id="bAplicar">Levar para a ficha</button><span id="aMsg" class="msg"></span></div><div class="dica" style="margin-top:6px">Leva tudo, já com as suas correções, para a ficha: dados da empresa, IDs (site e Instagram) e o bloco Contato e operação (endereço, telefone, e-mail, WhatsApp, horário, time, vendas). O que já estiver na ficha é trocado pelo que o cliente mandou.</div></div>';
       $("bAplicar").onclick = function(){
+        document.querySelectorAll("[data-cd]").forEach(function(i){ d[i.dataset.cd] = i.value.trim(); });
         var u = doFormulario(c, d);
         sb.from("clientes").update(u).eq("id", c.id).then(function(x){ var m = $("aMsg"); if(x.error){ m.className = "msg erro"; m.textContent = erroMsg(x.error); return; } m.className = "msg ok"; m.textContent = "Ficha atualizada com tudo o que o cliente mandou"; Object.assign(c, u); carregar(); });
       };
