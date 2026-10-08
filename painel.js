@@ -176,16 +176,27 @@
   function diaLocal(mais){ var d = new Date(); d.setDate(d.getDate() + mais); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   /* seções da tela Hoje: urgentes no topo, depois atrasadas, hoje e o futuro; dentro de cada uma, a ordem que o Thiago arrastou e depois o prazo */
   function secoesHoje(abertas){
-    var hoje = diaLocal(0), amanha = diaLocal(1), limite = diaLocal(7), S = [];
+    var hoje = diaLocal(0), amanha = diaLocal(1), fim14 = diaLocal(13), S = [];
     function add(k, titulo, filtro, cor){ var L = abertas.filter(filtro); S.push({k:k, titulo:titulo, itens:L, cor:cor}); }
     function ord(a, b){ return ((a.ordem || 0) - (b.ordem || 0)) || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")) || (a.prioridade - b.prioridade); }
+    function rotDia(d){ return new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"2-digit"}); }
     add("urg", "Urgentes", function(t){ return t.prioridade === 1; }, "al");
     var resto = function(t){ return t.prioridade !== 1; };
     add("atr", "Atrasadas", function(t){ return resto(t) && t.prazo && t.prazo < hoje; }, "al");
-    add(hoje, "Hoje", function(t){ return resto(t) && t.prazo === hoje; }, "ciano");
-    add(amanha, "Amanhã", function(t){ return resto(t) && t.prazo === amanha; });
-    add("sem7", "Próximos 7 dias", function(t){ return resto(t) && t.prazo && t.prazo > amanha && t.prazo <= limite; });
-    add("dep", "Mais pra frente", function(t){ return resto(t) && t.prazo && t.prazo > limite; });
+    for(var n = 0; n <= 13; n++){
+      (function(d, n){
+        add(d, (n === 0 ? "Hoje · " : n === 1 ? "Amanhã · " : "") + rotDia(d), function(t){ return resto(t) && t.prazo === d; }, n === 0 ? "ciano" : null);
+      })(diaLocal(n), n);
+    }
+    // depois de 14 dias: uma seção por semana (segunda a domingo)
+    var semanas = {};
+    abertas.forEach(function(t){
+      if(!resto(t) || !t.prazo || t.prazo <= fim14) return;
+      var d = new Date(t.prazo + "T12:00:00"), seg = new Date(d); seg.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      var k = seg.getFullYear() + "-" + String(seg.getMonth() + 1).padStart(2, "0") + "-" + String(seg.getDate()).padStart(2, "0");
+      (semanas[k] = semanas[k] || []).push(t);
+    });
+    Object.keys(semanas).sort().forEach(function(k){ S.push({k:"sem-" + k, titulo:"Semana de " + new Date(k + "T12:00:00").toLocaleDateString("pt-BR", {day:"2-digit", month:"2-digit"}), itens:semanas[k]}); });
     add("sem", "Sem prazo", function(t){ return resto(t) && !t.prazo; });
     S.forEach(function(x){ x.itens.sort(ord); });
     return S.filter(function(x){ return x.itens.length; });
@@ -197,7 +208,8 @@
     var T = est.tarefas;
     if(T === null){ $("main").innerHTML = '<div class="topo"><div><div class="mig">GROUP3989</div><h2>Hoje</h2></div></div><div class="conteudo"><div class="vazio">A tabela de tarefas ainda não existe. Rode o SQL 004 no Supabase.</div></div>'; return; }
     var hoje = diaLocal(0);
-    if(!est.filtroHoje){ try { est.filtroHoje = localStorage.getItem("g3989:hoje-filtro") || "tudo"; } catch(e){ est.filtroHoje = "tudo"; } }
+    if(!est.filtroHoje){ try { est.filtroHoje = localStorage.getItem("g3989:hoje-filtro") || "empresa"; } catch(e){ est.filtroHoje = "empresa"; } }
+    if(est.filtroHoje === "tudo" || est.membro) est.filtroHoje = "empresa";
     var filtro = est.filtroHoje, aberto = lerAbertos();
     var resp = function(t){ return t.responsavel || "Thiago"; };
     var pessoas = ["Thiago", "Willian"]; T.forEach(function(t){ if(pessoas.indexOf(resp(t)) < 0) pessoas.push(resp(t)); });
@@ -219,7 +231,7 @@
     var dataTxt = new Date().toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long"});
     var nP = T.filter(function(t){ return !t.feito && ehPessoal(t) && (pessoa === "todos" || resp(t) === pessoa); }).length, nE = T.filter(function(t){ return !t.feito && !ehPessoal(t) && (pessoa === "todos" || resp(t) === pessoa); }).length;
     function chip(v, rot, n){ return '<button class="chipf" data-filtro="' + v + '" aria-pressed="' + (filtro === v) + '">' + rot + ' <small>' + n + '</small></button>'; }
-    function abertoPadrao(k){ return k === "urg" || k === "atr" || k === hoje; }
+    function abertoPadrao(k){ return k === "urg" || k === "atr" || k === hoje || k === diaLocal(1); }
     function itemHTML(t){
       var cli = t.cliente_id ? cliPorId(t.cliente_id) : null;
       if(est.editT === t.id) return '<form class="item" data-fe="' + t.id + '" style="grid-template-columns:1fr;gap:8px">' +
@@ -246,9 +258,9 @@
         return '<details class="sub" data-ab="' + esc(id) + '"' + (ab ? " open" : "") + '><summary>' + esc(g) + ' <small>' + L.length + '</small></summary><div class="arrasta" data-secao="' + esc(sec.k) + '">' + L.map(itemHTML).join("") + '</div></details>';
       }).join("");
     }
-    $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>Hoje</h2></div><span class="esp"></span>' +
+    $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>' + (filtro === "pessoal" ? "Pessoal" : "Hoje") + '</h2></div><span class="esp"></span>' + (est.membro ? "" : '<div class="abas"><button class="aba" data-filtro="empresa" aria-selected="' + (filtro !== "pessoal") + '">Trabalho <small>' + nE + '</small></button><button class="aba" data-filtro="pessoal" aria-selected="' + (filtro === "pessoal") + '">Pessoal <small>' + nP + '</small></button></div>') +
       '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "← Voltar para as abertas" : "Feitas (" + T.filter(function(t){ return t.feito; }).length + ")") + '</button><button class="bt p" id="bNova">+ Nova</button><button class="bt p pri" id="bClaudeHoje">Copiar para o Claude</button><span id="hMsg" class="msg"></span></div>' +
-      '<div class="conteudo">' + (est.membro ? "" : '<div id="alertaExcl"></div>') + '<div class="cx"><div class="equipeDia">' + barras + '</div>' + (est.membro ? "" : '<div class="linha" style="gap:6px;margin-top:10px"><button class="chipf" data-pessoa="todos" aria-pressed="' + (pessoa === "todos") + '">Todos</button>' + pessoas.map(function(n){ return '<button class="chipf" data-pessoa="' + esc(n) + '" aria-pressed="' + (pessoa === n) + '">' + esc(n) + '</button>'; }).join("") + '<span style="width:12px"></span>' + chip("tudo", "Tudo", nP + nE) + chip("empresa", "Empresa", nE) + chip("pessoal", "Pessoal", nP) + '</div>') +
+      '<div class="conteudo">' + (est.membro ? "" : '<div id="alertaExcl"></div>') + '<div class="cx"><div class="equipeDia">' + barras + '</div>' + (est.membro ? "" : '<div class="linha" style="gap:6px;margin-top:10px"><button class="chipf" data-pessoa="todos" aria-pressed="' + (pessoa === "todos") + '">Todos</button>' + pessoas.map(function(n){ return '<button class="chipf" data-pessoa="' + esc(n) + '" aria-pressed="' + (pessoa === n) + '">' + esc(n) + '</button>'; }).join("") + '</div>') +
       '<div class="resumoHoje">' + (urg ? '<span class="r al">' + urg + ' urgentes</span>' : "") + (atrasadas ? '<span class="r al">' + atrasadas + ' atrasadas</span>' : "") + '<span class="r ci">' + deHoje + ' para hoje</span><span class="r">' + feitasHoje.length + ' feitas hoje</span><span class="r">' + abertas.length + ' abertas</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
       '<form class="linha" id="fTarefa" style="margin-top:12px' + (est.novaAberta ? "" : ";display:none") + '"><input class="busca" id="tTexto" style="margin:0;flex:2 1 240px" placeholder="Nova tarefa" required><input class="busca" id="tGrupo" style="margin:0;flex:1 1 140px" placeholder="Grupo (ex.: Trendyce ou Pessoal)" list="gruposT"><datalist id="gruposT">' + grupos.map(function(g){ return '<option value="' + esc(g) + '">'; }).join("") + '</datalist>' +
       '<input class="busca" id="tPrazo" type="date" style="margin:0;width:auto" value="' + hoje + '" title="Prazo"><select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select>' + (est.membro ? "" : '<select class="busca" id="tResp" style="margin:0;width:auto" title="Responsável">' + pessoas.map(function(n){ return '<option' + ((pessoa === "todos" ? "Thiago" : pessoa) === n ? " selected" : "") + '>' + esc(n) + '</option>'; }).join("") + '</select>') + '<button class="bt pri" type="submit">Adicionar</button></form></div>' +
@@ -341,19 +353,19 @@
   }
 
   /* dia local (Brasília) de uma data ISO, no formato AAAA-MM-DD */
-  function diaLocal(iso){ if(!iso) return ""; var d = new Date(iso); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
-  function somaDias(dia, n){ var d = new Date(dia + "T12:00:00"); d.setDate(d.getDate() + n); return diaLocal(d.toISOString()); }
+  function diaDeISO(iso){ if(!iso) return ""; var d = new Date(iso); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function somaDias(dia, n){ var d = new Date(dia + "T12:00:00"); d.setDate(d.getDate() + n); return diaDeISO(d.toISOString()); }
   function quemFez(t){ var q = String(t.feito_por || "").trim(); return q || "Sem registro"; }
 
   /* histórico: filtro por período e por quem fez; só o Thiago vê também as exclusões */
   function historicoFeitas(T){
-    var hoje = diaLocal(new Date().toISOString()), f = est.filtroFeitas || (est.filtroFeitas = {per:"ontem", dia:"", quem:"todos"});
+    var hoje = diaDeISO(new Date().toISOString()), f = est.filtroFeitas || (est.filtroFeitas = {per:"ontem", dia:"", quem:"todos"});
     var faixa = f.per === "hoje" ? [hoje, hoje] : f.per === "ontem" ? [somaDias(hoje, -1), somaDias(hoje, -1)] : f.per === "7d" ? [somaDias(hoje, -6), hoje] : f.per === "dia" && f.dia ? [f.dia, f.dia] : ["", "9999"];
     var Fall = T.filter(function(t){ return t.feito; }).sort(function(a, b){ return String(b.feito_em).localeCompare(String(a.feito_em)); });
-    var noPer = Fall.filter(function(t){ var d = diaLocal(t.feito_em); return d >= faixa[0] && d <= faixa[1]; });
+    var noPer = Fall.filter(function(t){ var d = diaDeISO(t.feito_em); return d >= faixa[0] && d <= faixa[1]; });
     var quems = []; Fall.forEach(function(t){ if(quems.indexOf(quemFez(t)) < 0) quems.push(quemFez(t)); });
     var F = noPer.filter(function(t){ return f.quem === "todos" || quemFez(t) === f.quem; }), dias = [];
-    F.forEach(function(t){ var d = diaLocal(t.feito_em); if(dias.indexOf(d) < 0) dias.push(d); });
+    F.forEach(function(t){ var d = diaDeISO(t.feito_em); if(dias.indexOf(d) < 0) dias.push(d); });
     var chipP = function(k, r){ return '<button class="chipf" data-fper="' + k + '" aria-pressed="' + (f.per === k) + '">' + r + '</button>'; };
     var chipQ = function(k, r){ var n = (k === "todos" ? noPer : noPer.filter(function(t){ return quemFez(t) === k; })).length; return '<button class="chipf" data-fquem="' + esc(k) + '" aria-pressed="' + (f.quem === k) + '">' + esc(r) + ' <small>' + n + '</small></button>'; };
     var c = document.querySelector(".conteudo");
@@ -363,7 +375,7 @@
       '<div class="dica" style="margin-top:8px">' + F.length + ' tarefas neste filtro. Desfazer devolve a tarefa para a lista de abertas.</div></div>' +
       (est.membro ? "" : '<div id="exclHist"></div>') +
       (F.length ? dias.map(function(d){
-        var L = F.filter(function(t){ return diaLocal(t.feito_em) === d; });
+        var L = F.filter(function(t){ return diaDeISO(t.feito_em) === d; });
         return '<div class="bloco"><h4>' + esc(d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"2-digit"}) : "Sem data") + ' <small>' + L.length + '</small></h4>' + L.map(function(t){
           return '<div class="item feito" style="grid-template-columns:minmax(0,1fr) auto;align-items:center"><div><div class="itx">' + esc(t.texto) + '</div><div class="quando">' + esc(t.grupo) + ' · <b>' + esc(quemFez(t)) + '</b> às ' + new Date(t.feito_em).toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"}) + (t.responsavel && t.responsavel !== quemFez(t) ? ' · responsável: ' + esc(t.responsavel) : "") + (t.observacao ? ' · ' + esc(t.observacao) : "") + '</div></div><button class="bt p" data-desfaz="' + t.id + '">Desfazer</button></div>';
         }).join("") + '</div>';
