@@ -471,11 +471,44 @@
     }; });
   }
 
+  /* fechamentos do cliente com o painel lateral de argumentos para a call (editável, salvo em fechamentos.argumentos) */
   function abaFechamentos(c){
     var L = (est.fech || []).filter(function(f){ return f.cliente_id === c.id; }).sort(function(a, b){ return b.mes.localeCompare(a.mes); });
-    $("corpo").innerHTML = '<div class="cx"><h3>Fechamentos mensais</h3><div class="dica">Um cartão por mês. O semanal deste cliente fica no Relatório Semanal.</div>' +
-      (L.length ? L.map(function(f){ return '<div class="item" style="grid-template-columns:minmax(0,1fr) auto;align-items:center"><div><b style="font-family:var(--ui);font-size:16px">' + esc(f.destaque || "") + '</b> <span class="quando">' + esc(f.rotulo || "") + '</span><div class="quando">' + esc(rotMes(f.mes)) + ' · ' + ST_F[f.status] + (f.enviado ? " · enviado" : "") + '</div>' + (f.nota ? '<div class="quando">' + esc(f.nota) + '</div>' : "") + '</div>' +
-        (f.url ? '<a class="bt p pri" href="' + esc(f.url) + '" target="_blank" rel="noopener">Abrir cartão</a>' : '<span class="quando">Sem cartão</span>') + '</div>'; }).join("") : '<div class="dica">Ainda sem fechamento mensal.</div>') + '</div>';
+    if(!L.length){ $("corpo").innerHTML = '<div class="cx"><h3>Fechamentos mensais</h3><div class="dica">Ainda sem fechamento mensal.</div></div>'; return; }
+    var sel = L.filter(function(f){ return f.id === est.fechSel; })[0] || L[0]; est.fechSel = sel.id;
+    var args = Array.isArray(sel.argumentos) ? sel.argumentos : [];
+    var semColuna = !("argumentos" in sel);
+    var lista = L.map(function(f){
+      return '<button class="fechItem' + (f.id === sel.id ? " sel" : "") + '" data-fsel="' + f.id + '"><b>' + esc(f.destaque || "") + '</b><span>' + esc(rotMes(f.mes)) + '</span><small>' + esc(f.rotulo || "") + '</small></button>';
+    }).join("");
+    var cartoes = args.map(function(a, k){
+      if(est.argEdit === sel.id + ":" + k) return '<form class="argCard edit" data-afrm="' + k + '"><input name="titulo" value="' + esc(a.titulo || "") + '" placeholder="Título curto"><textarea name="texto" rows="4" placeholder="O argumento, com o número">' + esc(a.texto || "") + '</textarea><div class="linha"><button class="bt pri p" type="submit">Salvar</button><button class="bt p" type="button" data-acancel="1">Cancelar</button><span style="flex:1"></span><button class="bt p perigo" type="button" data-adel="' + k + '">Excluir</button></div></form>';
+      return '<div class="argCard"><div class="argNum">' + (k + 1) + '</div><div class="argCorpo"><b>' + esc(a.titulo || "") + '</b><p>' + esc(a.texto || "").replace(/\n/g, "<br>") + '</p></div><button class="argEd" data-aed="' + k + '" title="Editar">✎</button></div>';
+    }).join("");
+    $("corpo").innerHTML = '<div class="fechGrid"><div class="cx"><h3>Fechamentos mensais</h3><div class="dica">Clique no mês para ver os argumentos da call ao lado.</div><div class="fechLista">' + lista + '</div>' +
+      (sel.url ? '<a class="bt p pri" style="margin-top:12px;display:inline-block" href="' + esc(sel.url) + '" target="_blank" rel="noopener">Abrir o cartão de ' + esc(rotMes(sel.mes)) + '</a>' : "") +
+      (sel.nota ? '<div class="dica" style="margin-top:10px">' + esc(sel.nota) + '</div>' : "") + '</div>' +
+      '<aside class="argPainel"><div class="argTopo"><div><div class="mig">Para a call</div><h3>' + esc(rotMes(sel.mes)) + ' · ' + esc(sel.destaque || "") + '</h3></div><button class="bt p" id="bArgCopiar" title="Copiar para o WhatsApp">Copiar</button></div>' +
+      (semColuna ? '<div class="dica">Falta rodar o SQL 008 no Supabase para salvar os argumentos.</div>' : "") +
+      (cartoes || '<div class="dica">Sem argumentos ainda.</div>') +
+      '<button class="bt p" id="bArgNovo" style="width:100%;margin-top:8px">+ Adicionar argumento</button><span id="argMsg" class="msg"></span></aside></div>';
+    function salvar(novos){
+      var m = $("argMsg"); if(m){ m.className = "msg"; m.textContent = "Salvando…"; }
+      sb.from("fechamentos").update({argumentos:novos}).eq("id", sel.id).then(function(r){
+        if(r.error){ if(m){ m.className = "msg erro"; m.textContent = erroMsg(r.error); } return; }
+        sel.argumentos = novos; est.argEdit = null; abaFechamentos(c);
+      });
+    }
+    document.querySelectorAll("[data-fsel]").forEach(function(b){ b.onclick = function(){ est.fechSel = b.dataset.fsel; est.argEdit = null; abaFechamentos(c); }; });
+    document.querySelectorAll("[data-aed]").forEach(function(b){ b.onclick = function(){ est.argEdit = sel.id + ":" + b.dataset.aed; abaFechamentos(c); }; });
+    document.querySelectorAll("[data-acancel]").forEach(function(b){ b.onclick = function(){ est.argEdit = null; abaFechamentos(c); }; });
+    document.querySelectorAll("[data-adel]").forEach(function(b){ b.onclick = function(){ var n = args.slice(); n.splice(+b.dataset.adel, 1); salvar(n); }; });
+    document.querySelectorAll("[data-afrm]").forEach(function(f){ f.onsubmit = function(ev){ ev.preventDefault(); var n = args.slice(); n[+f.dataset.afrm] = {titulo:f.elements.titulo.value.trim(), texto:f.elements.texto.value.trim()}; salvar(n); }; });
+    $("bArgNovo").onclick = function(){ var n = args.concat([{titulo:"", texto:""}]); sel.argumentos = n; est.argEdit = sel.id + ":" + (n.length - 1); abaFechamentos(c); };
+    $("bArgCopiar").onclick = function(){
+      var t = ["*" + c.nome + " · " + rotMes(sel.mes) + "*", ""].concat(args.map(function(a, k){ return (k + 1) + ". *" + (a.titulo || "") + "*\n" + (a.texto || ""); })).join("\n\n");
+      copiar(t, $("argMsg"), "Copiado");
+    };
   }
 
   function telaRegistro(){

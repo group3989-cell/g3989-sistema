@@ -212,3 +212,23 @@ details.sub>summary small{color:var(--tx3);font-weight:500;font-size:11px}
 .xis[aria-checked="true"]{background:#C2410C;border-color:#C2410C;opacity:1}
 .item.naofeito{border-color:rgba(194,65,12,.4)}
 .item.naofeito .itx{text-decoration:line-through;color:var(--tx3)}
+
+/* fechamentos: lista dos meses e painel lateral de argumentos para a call */
+.fechGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:16px;align-items:start}
+@media(max-width:860px){.fechGrid{grid-template-columns:1fr}}
+.fechLista{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.fechItem{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:12px;text-align:left;padding:10px 12px;border:1px solid var(--linha);border-radius:var(--rs);background:var(--sutil);color:inherit;cursor:pointer;font:inherit}
+.fechItem b{grid-row:span 2;font-size:20px;align-self:center}
+.fechItem span{font-weight:600}
+.fechItem small{color:var(--tx3);font-size:12px}
+.fechItem.sel{border-color:var(--ciano);box-shadow:0 0 0 1px var(--ciano) inset}
+.argPainel{position:sticky;top:12px;border:1px solid var(--linha);border-radius:14px;padding:16px;background:linear-gradient(160deg,rgba(0,40,97,.35),rgba(19,187,241,.08));max-height:calc(100vh - 40px);overflow:auto}
+.argTopo{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px}
+.argTopo h3{margin:2px 0 0}
+.argCard{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px;border:1px solid var(--linha);border-radius:10px;background:var(--fundo,rgba(0,0,0,.15));margin-bottom:8px}
+.argNum{width:28px;height:28px;border-radius:8px;background:var(--ciano);color:#002861;font-weight:700;display:grid;place-items:center}
+.argCorpo b{display:block;margin-bottom:4px}
+.argCorpo p{margin:0;font-size:13px;line-height:1.45;color:var(--tx2)}
+.argEd{border:0;background:none;color:var(--tx3);cursor:pointer;font-size:14px}
+.argCard.edit{display:flex;flex-direction:column;gap:8px}
+.argCard.edit input,.argCard.edit textarea{width:100%;border:1px solid var(--linha);border-radius:8px;padding:8px;background:transparent;color:inherit;font:inherit}
