@@ -452,7 +452,7 @@
           '<div><button class="bt p" style="border:0;background:none;padding:0;font-weight:600;font-family:var(--ui);font-size:14px" data-abre="' + f.c.id + '">' + esc(f.c.nome) + '</button><div class="quando">' + esc(f.c.descricao || grupoDe(f.c)) + '</div></div>' +
           '<div><b style="font-family:var(--ui);font-size:17px">' + esc(f.destaque || "") + '</b><div class="quando">' + esc(f.rotulo || "") + '</div></div>' +
           '<div class="linha" style="justify-content:flex-end"><span class="selo ' + (f.status === "ok" ? "ativo" : f.status === "parcial" ? "teste" : "pausado") + '">' + ST_F[f.status] + '</span>' +
-          (f.url ? '<label class="op"><input type="checkbox" data-env="' + f.id + '"' + (f.enviado ? " checked" : "") + '><span>Enviado</span></label><a class="bt p pri" href="' + esc(f.url) + '" target="_blank" rel="noopener">Abrir cartão</a>' : '<span class="quando">Sem cartão</span>') + '</div>' +
+          (f.url ? '<label class="op"><input type="checkbox" data-env="' + f.id + '"' + (f.enviado ? " checked" : "") + '><span>Enviado</span></label><a class="bt p pri" href="' + esc(f.url) + '" target="_blank" rel="noopener">Abrir cartão</a><button class="bt p" data-call="' + f.id + '|' + f.c.id + '" title="Painel de argumentos para a call">🎯 Argumentos da call</button>' : '<span class="quando">Sem cartão</span>') + '</div>' +
           (f.nota ? '<div class="quando" style="grid-column:1/-1;border-top:1px dashed var(--linha);padding-top:6px">' + esc(f.nota) + '</div>' : "") + '</div>';
       }).join("") || '<div class="dica" style="margin-top:12px">Nenhum cliente com esse filtro.</div>' : '<div class="vazio">Os fechamentos de ' + esc(nomeMes(est.mesC)) + ' ainda não foram montados. Peça ao Claude: "monta os fechamentos de ' + esc(nomeMes(est.mesC)) + '".</div>') + '</div>' +
       '<div class="cx"><h3>Ferramentas</h3><div class="g3" style="margin-top:12px">' +
@@ -465,6 +465,7 @@
     $("cBusca").oninput = function(){ est.buscaC = this.value; var p = this.selectionStart; telaCentral(); var b = $("cBusca"); b.focus(); b.setSelectionRange(p, p); };
     document.querySelectorAll('input[name="grupoC"]').forEach(function(x){ x.onchange = function(){ est.grupoC = x.value; telaCentral(); }; });
     document.querySelectorAll("[data-abre]").forEach(function(b){ b.onclick = function(){ abrirCliente(b.dataset.abre, "fechamentos"); }; });
+    document.querySelectorAll("[data-call]").forEach(function(b){ b.onclick = function(){ var p = b.dataset.call.split("|"); est.fechSel = p[0]; est.argEdit = null; abrirCliente(p[1], "fechamentos"); }; });
     document.querySelectorAll("[data-env]").forEach(function(x){ x.onchange = function(){
       var v = x.checked, f = (est.fech || []).filter(function(y){ return y.id === x.dataset.env; })[0];
       sb.from("fechamentos").update({enviado:v, enviado_em:v ? new Date().toISOString() : null}).eq("id", x.dataset.env).then(function(u){ if(u.error){ x.checked = !v; return alertaErro(u.error); } if(f) f.enviado = v; telaCentral(); });
