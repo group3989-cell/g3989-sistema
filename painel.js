@@ -248,7 +248,7 @@
     }
     $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>Hoje</h2></div><span class="esp"></span>' +
       '<button class="bt p" id="bVerFeitas">' + (est.verFeitas ? "← Voltar para as abertas" : "Feitas (" + T.filter(function(t){ return t.feito; }).length + ")") + '</button><button class="bt p" id="bNova">+ Nova</button><button class="bt p pri" id="bClaudeHoje">Copiar para o Claude</button><span id="hMsg" class="msg"></span></div>' +
-      '<div class="conteudo"><div class="cx"><div class="equipeDia">' + barras + '</div>' + (est.membro ? "" : '<div class="linha" style="gap:6px;margin-top:10px"><button class="chipf" data-pessoa="todos" aria-pressed="' + (pessoa === "todos") + '">Todos</button>' + pessoas.map(function(n){ return '<button class="chipf" data-pessoa="' + esc(n) + '" aria-pressed="' + (pessoa === n) + '">' + esc(n) + '</button>'; }).join("") + '<span style="width:12px"></span>' + chip("tudo", "Tudo", nP + nE) + chip("empresa", "Empresa", nE) + chip("pessoal", "Pessoal", nP) + '</div>') +
+      '<div class="conteudo">' + (est.membro ? "" : '<div id="alertaExcl"></div>') + '<div class="cx"><div class="equipeDia">' + barras + '</div>' + (est.membro ? "" : '<div class="linha" style="gap:6px;margin-top:10px"><button class="chipf" data-pessoa="todos" aria-pressed="' + (pessoa === "todos") + '">Todos</button>' + pessoas.map(function(n){ return '<button class="chipf" data-pessoa="' + esc(n) + '" aria-pressed="' + (pessoa === n) + '">' + esc(n) + '</button>'; }).join("") + '<span style="width:12px"></span>' + chip("tudo", "Tudo", nP + nE) + chip("empresa", "Empresa", nE) + chip("pessoal", "Pessoal", nP) + '</div>') +
       '<div class="resumoHoje">' + (urg ? '<span class="r al">' + urg + ' urgentes</span>' : "") + (atrasadas ? '<span class="r al">' + atrasadas + ' atrasadas</span>' : "") + '<span class="r ci">' + deHoje + ' para hoje</span><span class="r">' + feitasHoje.length + ' feitas hoje</span><span class="r">' + abertas.length + ' abertas</span></div><div class="prog"><span style="width:' + p + '%"></span></div>' +
       '<form class="linha" id="fTarefa" style="margin-top:12px' + (est.novaAberta ? "" : ";display:none") + '"><input class="busca" id="tTexto" style="margin:0;flex:2 1 240px" placeholder="Nova tarefa" required><input class="busca" id="tGrupo" style="margin:0;flex:1 1 140px" placeholder="Grupo (ex.: Trendyce ou Pessoal)" list="gruposT"><datalist id="gruposT">' + grupos.map(function(g){ return '<option value="' + esc(g) + '">'; }).join("") + '</datalist>' +
       '<input class="busca" id="tPrazo" type="date" style="margin:0;width:auto" value="' + hoje + '" title="Prazo"><select class="busca" id="tPri" style="margin:0;width:auto"><option value="1">Urgente</option><option value="2" selected>Normal</option><option value="3">Sem pressa</option></select>' + (est.membro ? "" : '<select class="busca" id="tResp" style="margin:0;width:auto" title="Responsável">' + pessoas.map(function(n){ return '<option' + ((pessoa === "todos" ? "Thiago" : pessoa) === n ? " selected" : "") + '>' + esc(n) + '</option>'; }).join("") + '</select>') + '<button class="bt pri" type="submit">Adicionar</button></form></div>' +
@@ -262,6 +262,7 @@
     $("bNova").onclick = function(){ est.novaAberta = !est.novaAberta; telaHoje(); if(est.novaAberta) $("tTexto").focus(); };
     $("bVerFeitas").onclick = function(){ est.verFeitas = !est.verFeitas; telaHoje(); };
     ligarArrastar(T);
+    alertaExclusoes();
     if(est.verFeitas) return historicoFeitas(T);
     document.querySelectorAll("[data-abre]").forEach(function(b){ b.onclick = function(){ abrirCliente(b.dataset.abre); }; });
     document.querySelectorAll("[data-tf]").forEach(function(b){ b.onclick = function(){
@@ -339,22 +340,67 @@
     });
   }
 
-  /* histórico: tudo o que foi feito, do mais recente para o mais antigo, agrupado por dia; dá para desfazer */
+  /* dia local (Brasília) de uma data ISO, no formato AAAA-MM-DD */
+  function diaLocal(iso){ if(!iso) return ""; var d = new Date(iso); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function somaDias(dia, n){ var d = new Date(dia + "T12:00:00"); d.setDate(d.getDate() + n); return diaLocal(d.toISOString()); }
+  function quemFez(t){ var q = String(t.feito_por || "").trim(); return q || "Sem registro"; }
+
+  /* histórico: filtro por período e por quem fez; só o Thiago vê também as exclusões */
   function historicoFeitas(T){
-    var F = T.filter(function(t){ return t.feito; }).sort(function(a, b){ return String(b.feito_em).localeCompare(String(a.feito_em)); }), dias = [];
-    F.forEach(function(t){ var d = String(t.feito_em || "").slice(0, 10); if(dias.indexOf(d) < 0) dias.push(d); });
+    var hoje = diaLocal(new Date().toISOString()), f = est.filtroFeitas || (est.filtroFeitas = {per:"ontem", dia:"", quem:"todos"});
+    var faixa = f.per === "hoje" ? [hoje, hoje] : f.per === "ontem" ? [somaDias(hoje, -1), somaDias(hoje, -1)] : f.per === "7d" ? [somaDias(hoje, -6), hoje] : f.per === "dia" && f.dia ? [f.dia, f.dia] : ["", "9999"];
+    var Fall = T.filter(function(t){ return t.feito; }).sort(function(a, b){ return String(b.feito_em).localeCompare(String(a.feito_em)); });
+    var noPer = Fall.filter(function(t){ var d = diaLocal(t.feito_em); return d >= faixa[0] && d <= faixa[1]; });
+    var quems = []; Fall.forEach(function(t){ if(quems.indexOf(quemFez(t)) < 0) quems.push(quemFez(t)); });
+    var F = noPer.filter(function(t){ return f.quem === "todos" || quemFez(t) === f.quem; }), dias = [];
+    F.forEach(function(t){ var d = diaLocal(t.feito_em); if(dias.indexOf(d) < 0) dias.push(d); });
+    var chipP = function(k, r){ return '<button class="chipf" data-fper="' + k + '" aria-pressed="' + (f.per === k) + '">' + r + '</button>'; };
+    var chipQ = function(k, r){ var n = (k === "todos" ? noPer : noPer.filter(function(t){ return quemFez(t) === k; })).length; return '<button class="chipf" data-fquem="' + esc(k) + '" aria-pressed="' + (f.quem === k) + '">' + esc(r) + ' <small>' + n + '</small></button>'; };
     var c = document.querySelector(".conteudo");
-    c.innerHTML = '<div class="cx"><h3>Histórico de feitas</h3><div class="dica">' + F.length + ' tarefas concluídas. Desfazer devolve a tarefa para a lista de abertas.</div></div>' +
+    c.innerHTML = '<div class="cx"><h3>Histórico de feitas</h3>' +
+      '<div class="linha" style="gap:6px;margin-top:10px">' + chipP("hoje", "Hoje") + chipP("ontem", "Ontem") + chipP("7d", "7 dias") + chipP("tudo", "Tudo") + '<input type="date" class="busca" id="fDia" style="margin:0;width:auto" value="' + esc(f.per === "dia" ? f.dia : "") + '" title="Escolher um dia"></div>' +
+      '<div class="linha" style="gap:6px;margin-top:8px"><span class="msg">Quem fez:</span>' + chipQ("todos", "Todos") + quems.map(function(q){ return chipQ(q, q); }).join("") + '</div>' +
+      '<div class="dica" style="margin-top:8px">' + F.length + ' tarefas neste filtro. Desfazer devolve a tarefa para a lista de abertas.</div></div>' +
+      (est.membro ? "" : '<div id="exclHist"></div>') +
       (F.length ? dias.map(function(d){
-        var L = F.filter(function(t){ return String(t.feito_em || "").slice(0, 10) === d; });
+        var L = F.filter(function(t){ return diaLocal(t.feito_em) === d; });
         return '<div class="bloco"><h4>' + esc(d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"2-digit"}) : "Sem data") + ' <small>' + L.length + '</small></h4>' + L.map(function(t){
-          return '<div class="item feito" style="grid-template-columns:minmax(0,1fr) auto;align-items:center"><div><div class="itx">' + esc(t.texto) + '</div><div class="quando">' + esc(t.grupo) + ' · ' + esc(t.feito_por || "") + ' às ' + new Date(t.feito_em).toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"}) + (t.observacao ? ' · ' + esc(t.observacao) : "") + '</div></div><button class="bt p" data-desfaz="' + t.id + '">Desfazer</button></div>';
+          return '<div class="item feito" style="grid-template-columns:minmax(0,1fr) auto;align-items:center"><div><div class="itx">' + esc(t.texto) + '</div><div class="quando">' + esc(t.grupo) + ' · <b>' + esc(quemFez(t)) + '</b> às ' + new Date(t.feito_em).toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"}) + (t.responsavel && t.responsavel !== quemFez(t) ? ' · responsável: ' + esc(t.responsavel) : "") + (t.observacao ? ' · ' + esc(t.observacao) : "") + '</div></div><button class="bt p" data-desfaz="' + t.id + '">Desfazer</button></div>';
         }).join("") + '</div>';
-      }).join("") : '<div class="vazio">Nada concluído ainda.</div>');
+      }).join("") : '<div class="vazio">Nada concluído neste filtro.</div>');
+    c.querySelectorAll("[data-fper]").forEach(function(b){ b.onclick = function(){ f.per = b.dataset.fper; f.dia = ""; historicoFeitas(T); }; });
+    c.querySelectorAll("[data-fquem]").forEach(function(b){ b.onclick = function(){ f.quem = b.dataset.fquem; historicoFeitas(T); }; });
+    $("fDia").onchange = function(){ if(this.value){ f.per = "dia"; f.dia = this.value; } else { f.per = "tudo"; f.dia = ""; } historicoFeitas(T); };
     c.querySelectorAll("[data-desfaz]").forEach(function(b){ b.onclick = function(){
       var t = T.filter(function(x){ return x.id === b.dataset.desfaz; })[0]; b.disabled = true;
       sb.from("tarefas").update({feito:false, feito_em:null, feito_por:null}).eq("id", t.id).then(function(r){ if(r.error){ b.disabled = false; return alertaErro(r.error); } t.feito = false; t.feito_em = null; t.feito_por = null; render(); });
     }; });
+    if(!est.membro){
+      var q = sb.from("tarefas_excluidas").select("*").order("excluido_em", {ascending:false}).limit(200);
+      if(faixa[0]) q = q.gte("excluido_em", faixa[0] + "T00:00:00-03:00").lte("excluido_em", faixa[1] + "T23:59:59-03:00");
+      q.then(function(r){
+        var box = $("exclHist"); if(!box || r.error) return;
+        var E = r.data || [];
+        box.innerHTML = '<div class="bloco"><h4 style="color:var(--al)">Excluídas no período <small>' + E.length + '</small></h4>' + (E.length ? E.map(function(x){
+          return '<div class="item" style="grid-template-columns:minmax(0,1fr);border-color:rgba(255,92,92,.35)"><div><div class="itx">🗑️ ' + esc(x.texto) + '</div><div class="quando">' + esc(x.grupo || "") + ' · excluída por <b>' + esc(x.excluido_por || "?") + '</b> em ' + dataBR(x.excluido_em) + (x.feito ? " · estava feita" : " · estava aberta") + '</div></div></div>';
+        }).join("") : '<div class="dica">Nenhuma exclusão neste período.</div>') + '</div>';
+      });
+    }
+  }
+
+  /* alerta só na tela do Thiago: tarefas excluídas desde a última vez que ele viu */
+  function alertaExclusoes(){
+    if(est.membro) return;
+    var visto = ""; try { visto = localStorage.getItem("g3989:excl-visto") || ""; } catch(e){}
+    if(!visto) visto = new Date(Date.now() - 2 * 864e5).toISOString();
+    sb.from("tarefas_excluidas").select("texto,grupo,excluido_por,excluido_em").gt("excluido_em", visto).order("excluido_em", {ascending:false}).limit(50).then(function(r){
+      var box = $("alertaExcl"); if(!box || r.error || !(r.data || []).length) return;
+      var E = r.data;
+      box.innerHTML = '<div class="cx" style="border-color:var(--al);margin-bottom:12px"><div class="linha"><b style="color:var(--al)">🔴 ' + E.length + (E.length > 1 ? " tarefas excluídas" : " tarefa excluída") + ' desde ' + dataBR(visto) + '</b><span style="flex:1"></span><button class="bt p" id="bExclVisto">Ok, vi</button></div>' +
+        E.slice(0, 8).map(function(x){ return '<div class="quando" style="margin-top:6px">🗑️ ' + esc(x.texto) + ' · ' + esc(x.grupo || "") + ' · por <b>' + esc(x.excluido_por || "?") + '</b> em ' + dataBR(x.excluido_em) + '</div>'; }).join("") +
+        (E.length > 8 ? '<div class="dica">E mais ' + (E.length - 8) + '. Veja em Feitas.</div>' : "") + '</div>';
+      $("bExclVisto").onclick = function(){ try { localStorage.setItem("g3989:excl-visto", new Date().toISOString()); } catch(e){} box.innerHTML = ""; };
+    });
   }
 
   /* ---------- Central de fechamentos (migrada do claude.ai em 06/10/2026) ---------- */
