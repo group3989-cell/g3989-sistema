@@ -180,12 +180,12 @@
     function add(k, titulo, filtro, cor){ var L = abertas.filter(filtro); S.push({k:k, titulo:titulo, itens:L, cor:cor}); }
     function ord(a, b){ return ((a.ordem || 0) - (b.ordem || 0)) || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")) || (a.prioridade - b.prioridade); }
     function rotDia(d){ return new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"2-digit"}); }
-    add("urg", "Urgentes", function(t){ return t.prioridade === 1; }, "al");
-    var resto = function(t){ return t.prioridade !== 1; };
-    add("atr", "Atrasadas", function(t){ return resto(t) && t.prazo && t.prazo < hoje; }, "al");
-    for(var n = 0; n <= 13; n++){
+    var resto = function(t){ return true; };
+    // hoje = tudo que vence hoje, o que está atrasado e o urgente sem data
+    add(hoje, "Hoje · " + rotDia(hoje), function(t){ return (t.prazo && t.prazo <= hoje) || (!t.prazo && t.prioridade === 1); }, "ciano");
+    for(var n = 1; n <= 13; n++){
       (function(d, n){
-        add(d, (n === 0 ? "Hoje · " : n === 1 ? "Amanhã · " : "") + rotDia(d), function(t){ return resto(t) && t.prazo === d; }, n === 0 ? "ciano" : null);
+        add(d, (n === 1 ? "Amanhã · " : "") + rotDia(d), function(t){ return t.prazo === d; }, null);
       })(diaLocal(n), n);
     }
     // depois de 14 dias: uma seção por semana (segunda a domingo)
@@ -197,8 +197,10 @@
       (semanas[k] = semanas[k] || []).push(t);
     });
     Object.keys(semanas).sort().forEach(function(k){ S.push({k:"sem-" + k, titulo:"Semana de " + new Date(k + "T12:00:00").toLocaleDateString("pt-BR", {day:"2-digit", month:"2-digit"}), itens:semanas[k]}); });
-    add("sem", "Sem prazo", function(t){ return resto(t) && !t.prazo; });
-    S.forEach(function(x){ x.itens.sort(ord); });
+    add("sem", "Sem prazo", function(t){ return !t.prazo && t.prioridade !== 1; });
+    // dentro do dia: urgente primeiro, depois atrasada, depois a ordem arrastada
+    function peso(t){ return (t.prioridade === 1 ? 0 : 2) + (t.prazo && t.prazo < hoje ? 0 : 1); }
+    S.forEach(function(x){ x.itens.sort(function(a, b){ return (peso(a) - peso(b)) || ord(a, b); }); });
     return S.filter(function(x){ return x.itens.length; });
   }
   function ehPessoal(t){ return /^pessoal$/i.test(String(t.grupo || "").trim()); }
@@ -231,7 +233,7 @@
     var dataTxt = new Date().toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long"});
     var nP = T.filter(function(t){ return !t.feito && ehPessoal(t) && (pessoa === "todos" || resp(t) === pessoa); }).length, nE = T.filter(function(t){ return !t.feito && !ehPessoal(t) && (pessoa === "todos" || resp(t) === pessoa); }).length;
     function chip(v, rot, n){ return '<button class="chipf" data-filtro="' + v + '" aria-pressed="' + (filtro === v) + '">' + rot + ' <small>' + n + '</small></button>'; }
-    function abertoPadrao(k){ return k === "urg" || k === "atr" || k === hoje || k === diaLocal(1); }
+    function abertoPadrao(k){ return k === hoje || k === diaLocal(1); }
     function itemHTML(t){
       var cli = t.cliente_id ? cliPorId(t.cliente_id) : null;
       if(est.editT === t.id) return '<form class="item" data-fe="' + t.id + '" style="grid-template-columns:1fr;gap:8px">' +
@@ -243,7 +245,7 @@
         '<div class="quando">' + esc(/^virada:/.test(t.origem || "") ? "Veio da Virada" : "Criada por " + (t.criado_por || "")) + '</div>' +
         '<div class="linha"><button class="bt pri p" type="submit">Salvar</button><button class="bt p" type="button" data-cancela="1">Cancelar</button><span style="flex:1"></span><button class="bt p perigo" type="button" data-apaga="' + t.id + '">Excluir tarefa</button></div></form>';
       var atras = t.prazo && t.prazo < hoje;
-      var quando = t.prazo ? (atras ? "atrasada, " : t.prazo === hoje ? "hoje, " : "") + t.prazo.split("-").reverse().slice(0, 2).join("/") : "sem prazo";
+      var quando = (t.prioridade === 1 ? "🔴 urgente · " : "") + (t.prazo ? (atras ? "atrasada, " : t.prazo === hoje ? "hoje, " : "") + t.prazo.split("-").reverse().slice(0, 2).join("/") : "sem prazo");
       return '<div class="item arrastavel compacto" data-id="' + t.id + '"><div class="pega"><span class="alca" title="Arraste para mudar a ordem ou o prazo" aria-label="Arrastar">⋮⋮</span><button class="tick" role="checkbox" aria-checked="false" aria-label="Marcar como feita" data-tf="' + t.id + '"></button></div>' +
         '<div><div class="itx">' + esc(t.texto) + '</div>' +
         '<div class="quando"><span' + (atras ? ' style="color:var(--al)"' : "") + '>' + esc(quando) + '</span>' + (!est.membro && resp(t) !== "Thiago" ? ' · <b class="quem">' + esc(resp(t)) + '</b>' : "") + (cli ? ' · <button class="lk" data-abre="' + cli.id + '">' + esc(cli.nome) + '</button>' : "") + (t.detalhe ? ' · ' + esc(t.detalhe) : "") + (t.observacao ? ' · <i>' + esc(t.observacao) + '</i>' : "") + '</div></div>' +
@@ -252,10 +254,11 @@
     function corpoSecao(sec){
       var porG = {}, ordemG = [];
       sec.itens.forEach(function(t){ if(!porG[t.grupo]){ porG[t.grupo] = []; ordemG.push(t.grupo); } porG[t.grupo].push(t); });
-      if(ordemG.length <= 1 || sec.itens.length <= 4) return '<div class="arrasta" data-secao="' + esc(sec.k) + '">' + sec.itens.map(itemHTML).join("") + '</div>';
+      var nU = function(g){ return porG[g].filter(function(t){ return t.prioridade === 1; }).length; }, nA = function(g){ return porG[g].filter(function(t){ return t.prazo && t.prazo < hoje; }).length; };
+      ordemG.sort(function(a, b){ return ((nU(b) > 0) - (nU(a) > 0)) || ((nA(b) > 0) - (nA(a) > 0)) || (porG[b].length - porG[a].length) || String(a).localeCompare(String(b)); });
       return ordemG.map(function(g){
-        var id = sec.k + "|" + g, L = porG[g], ab = aberto[id] !== undefined ? aberto[id] : L.length <= 2;
-        return '<details class="sub" data-ab="' + esc(id) + '"' + (ab ? " open" : "") + '><summary>' + esc(g) + ' <small>' + L.length + '</small></summary><div class="arrasta" data-secao="' + esc(sec.k) + '">' + L.map(itemHTML).join("") + '</div></details>';
+        var id = sec.k + "|" + g, L = porG[g], ab = aberto[id] !== undefined ? aberto[id] : (sec.k === hoje || L.length <= 2);
+        return '<details class="sub" data-ab="' + esc(id) + '"' + (ab ? " open" : "") + '><summary>' + esc(g) + ' <small>' + L.length + '</small>' + (nU(g) ? ' <span style="color:var(--al);font-size:12px">🔴 ' + nU(g) + ' urgente' + (nU(g) > 1 ? "s" : "") + '</span>' : "") + (nA(g) ? ' <span style="color:var(--al);font-size:12px">' + nA(g) + ' atrasada' + (nA(g) > 1 ? "s" : "") + '</span>' : "") + '</summary><div class="arrasta" data-secao="' + esc(sec.k) + '">' + L.map(itemHTML).join("") + '</div></details>';
       }).join("");
     }
     $("main").innerHTML = '<div class="topo"><div><div class="mig">' + esc(dataTxt) + '</div><h2>' + (filtro === "pessoal" ? "Pessoal" : "Hoje") + '</h2></div><span class="esp"></span>' + (est.membro ? "" : '<div class="abas"><button class="aba" data-filtro="empresa" aria-selected="' + (filtro !== "pessoal") + '">Trabalho <small>' + nE + '</small></button><button class="aba" data-filtro="pessoal" aria-selected="' + (filtro === "pessoal") + '">Pessoal <small>' + nP + '</small></button></div>') +
