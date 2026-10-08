@@ -8,6 +8,7 @@ window.G3989 = {
   /* telas que ainda moram fora do sistema; o menu leva até elas */
   ferramentas: [
     { nome: "Virada de Mês", url: "https://claude.ai/artifact/VqsXspAWo5kXos6DxG85Jp" },
+    { nome: "Fechamento Mensal", view: "central" },
     { nome: "Relatório Semanal", url: "https://claude.ai/artifact/Qe4NYW2JeQZhbqqJpvPeub" },
     { nome: "Chronos", url: "https://chronosdock.com/home" }
   ]
