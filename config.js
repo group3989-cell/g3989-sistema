@@ -9,6 +9,7 @@ window.G3989 = {
   ferramentas: [
     { nome: "Virada de Mês", url: "https://claude.ai/artifact/VqsXspAWo5kXos6DxG85Jp" },
     { nome: "Fechamento Mensal", view: "central" },
+    { nome: "Escritório", url: "/escritorio/" },
     { nome: "Relatório Semanal", url: "https://claude.ai/artifact/Qe4NYW2JeQZhbqqJpvPeub" },
     { nome: "Chronos", url: "https://chronosdock.com/home" }
   ]

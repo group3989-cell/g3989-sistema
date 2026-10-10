@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Escritório G3989</title>
+<link rel="icon" href="../assets/logo-azul.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Planta vista de cima, à noite: salas por setor no canvas, painel lateral com a mesa do Thiago e o registro ao vivo. Visual único escuro. */
+:root{
+  color-scheme:dark;
+  --bg:#070d1c; --piso:#0c1630; --linha:#1d2b4f; --fg:#e8eefc; --fg2:#9fb0d6; --fg3:#6b7ca6;
+  --marinho:#002861; --ciano:#13bbf1; --ok:#35d39a; --alerta:#ffb547; --erro:#ff5d73;
+  --f-disp:'Sora',system-ui,sans-serif; --f-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-disp);margin:0}
+.wrap{padding-block:16px;padding-inline:16px;max-width:1400px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{margin:0;font-size:22px;letter-spacing:-.01em;text-wrap:balance}
+h1 span{color:var(--ciano)}
+.sub{color:var(--fg2);font-size:13px;margin-top:4px}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap}
+button{font:600 12px var(--f-disp);color:var(--fg);background:#13224a;border:1px solid var(--linha);border-radius:8px;padding:8px 12px;cursor:pointer}
+button:hover{border-color:var(--ciano)}
+button:focus-visible{outline:2px solid var(--ciano);outline-offset:2px}
+button.on{background:var(--ciano);color:#00203f;border-color:var(--ciano)}
+.selo{font:500 11px var(--f-mono);color:var(--alerta);border:1px dashed #6b5320;border-radius:6px;padding:4px 8px}
+.grade{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px}
+@media(max-width:980px){.grade{grid-template-columns:1fr}}
+.planta{background:var(--piso);border:1px solid var(--linha);border-radius:14px;overflow:hidden;min-width:0;position:relative}
+canvas{display:block;width:100%;height:auto}
+aside{display:flex;flex-direction:column;gap:14px;min-width:0}
+.caixa{background:#0b1430;border:1px solid var(--linha);border-radius:14px;padding:14px;min-width:0}
+.caixa h2{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2)}
+.mesa-item{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:10px;border:1px solid #2a3b66;border-radius:10px;margin-bottom:8px;background:#0e1a3b}
+.mesa-item b{font-size:13px}
+.mesa-item small{grid-column:2;color:var(--fg2);font-size:12px}
+.pill{font:600 10px var(--f-mono);padding:3px 6px;border-radius:6px;align-self:start;white-space:nowrap}
+.p-apr{background:#3a2a07;color:var(--alerta)}
+.p-info{background:#06303a;color:var(--ciano)}
+.vazio{color:var(--fg3);font-size:13px}
+#log{font:12px/1.5 var(--f-mono);max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+#log div{color:var(--fg2)}
+#log em{font-style:normal;color:var(--fg)}
+#log .ok{color:var(--ok)} #log .dev{color:var(--erro)} #log .esp{color:var(--alerta)}
+.ficha{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.ficha .nome{font-size:18px;font-weight:700}
+.ficha .linha{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--linha);padding-bottom:6px}
+.ficha .linha span:first-child{color:var(--fg3)}
+.ficha code{font:12px var(--f-mono);color:var(--ciano);word-break:break-all}
+.legenda{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--fg2)}
+.legenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+.porta{min-height:100%;display:grid;place-items:center;padding:16px}.porta .caixa{max-width:380px;text-align:center}.lnk{display:inline-block;margin-top:10px;color:var(--ciano)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Escritório <span>G3989</span></h1>
+      <div class="sub">24 agentes em 13 salas. Todo trabalho anda de mesa em mesa: autor, Tomé, Sofia, Themis e Sentinela, Clara e, por fim, você.</div>
+    </div>
+    <div class="ctrl">
+      <span class="selo" id="selo">SIMULAÇÃO dos fluxos reais (a trilha do GitHub entra na fase 8)</span>
+      <button id="bPlay" class="on" aria-pressed="true">Pausar</button>
+      <button id="bVel">Velocidade 1x</button>
+      <button id="bPausa" aria-pressed="false">Botão PAUSA</button>
+    </div>
+  </header>
+
+  <div class="grade">
+    <div class="planta"><canvas id="cv" width="1200" height="760" aria-label="Planta do escritório com os agentes"></canvas></div>
+    <aside>
+      <div class="caixa">
+        <h2>Mesa do Thiago</h2>
+        <div id="mesa"><div class="vazio">Nada esperando por você agora.</div></div>
+      </div>
+      <div class="caixa">
+        <h2>Agente</h2>
+        <div id="ficha" class="ficha"><div class="vazio">Toque num agente na planta para ver a ficha.</div></div>
+      </div>
+      <div class="caixa">
+        <h2>Registro</h2>
+        <div id="log"></div>
+      </div>
+    </aside>
+  </div>
+  <div class="legenda">
+    <span><i style="background:#9fb0d6"></i>Livre</span>
+    <span><i style="background:#13bbf1"></i>Trabalhando</span>
+    <span><i style="background:#35d39a"></i>Aprovado</span>
+    <span><i style="background:#ff5d73"></i>Devolvido</span>
+    <span><i style="background:#ffb547"></i>Esperando você</span>
+  </div>
+</div>
+
+<script>
+window.iniciarEscritorio=function(){
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const W=1200,H=760;
+const salas=[
+ {id:'thiago',nome:'Mesa do Thiago',cor:'#e8eefc',x:30,y:30,w:270,h:160},
+ {id:'diretoria',nome:'Diretoria',cor:'#2f6fd6',x:320,y:30,w:280,h:160},
+ {id:'qualidade',nome:'Qualidade',cor:'#35d39a',x:620,y:30,w:260,h:160},
+ {id:'auditoria',nome:'Auditoria',cor:'#a77bff',x:900,y:30,w:270,h:160},
+ {id:'dados',nome:'Dados',cor:'#8a98b8',x:30,y:215,w:270,h:160},
+ {id:'trafego',nome:'Tráfego',cor:'#13bbf1',x:320,y:215,w:280,h:160},
+ {id:'criativo',nome:'Criativo',cor:'#ff8a3d',x:620,y:215,w:260,h:160},
+ {id:'mercado',nome:'Mercado e Planejamento',cor:'#ffd147',x:900,y:215,w:270,h:160},
+ {id:'operacao',nome:'Operação',cor:'#7cc8ff',x:30,y:400,w:270,h:160},
+ {id:'admfin',nome:'Administrativo e Financeiro',cor:'#2fae7a',x:320,y:400,w:560,h:160},
+ {id:'comercial',nome:'Comercial',cor:'#ff5d73',x:900,y:400,w:270,h:160},
+ {id:'atendimento',nome:'Atendimento',cor:'#ff7fc8',x:30,y:585,w:270,h:150},
+ {id:'arquivo',nome:'Arquivo',cor:'#b9875a',x:320,y:585,w:850,h:150}
+];
+const S=Object.fromEntries(salas.map(s=>[s.id,s]));
+const A=[
+ ['atlas','Atlas','diretoria','Diretor: abre o fluxo, chama as camadas, controla as voltas','Sonnet'],
+ ['clara','Clara','diretoria','Consolidadora: escreve a entrega final para você','Sonnet'],
+ ['tome','Tomé','qualidade','Verificador: refaz as contas na fonte','Sonnet'],
+ ['sofia','Sofia','qualidade','Revisora: analisa a verificação do Tomé','Sonnet'],
+ ['themis','Themis','auditoria','Auditora de conformidade (leis, plataformas, regra do cliente)','Opus'],
+ ['sentinela','Sentinela','auditoria','Auditora de segurança (segredo, dado pessoal, permissão)','Haiku'],
+ ['hermes','Hermes','dados','Robôs de coleta no GitHub Actions (Meta, Instagram, GA4, Heaven, Google Ads)','Sem IA'],
+ ['argos','Argos','dados','Vigia: saldo, cobrança, link quebrado, conta parada','Haiku'],
+ ['orion','Orion','trafego','Analista de tráfego: diário, semanal, fechamento','Sonnet'],
+ ['leo','Leo','trafego','Gestor de campanhas: único que mexe em conta, só com sua aprovação','Sonnet'],
+ ['lia','Lia','criativo','Copywriter na voz de cada cliente','Sonnet'],
+ ['lumi','Lumi','criativo','Roteirista de vídeo com o modelo aprovado','Sonnet'],
+ ['radar','Radar','mercado','Pesquisa da Biblioteca de Anúncios, todo mês','Sonnet'],
+ ['vetor','Vetor','mercado','Planos de data de trás para frente (Black Friday)','Opus'],
+ ['otto','Otto','operacao','Tarefas do Sistema, agenda e lembretes','Haiku'],
+ ['juno','Juno','admfin','Contratos: vigência, teste, renovação, assinatura','Haiku'],
+ ['cora','Cora','admfin','Contas a receber: fee, comissão, NF, cobrança','Sonnet'],
+ ['tito','Tito','admfin','Caixa da empresa (só PJ) e previsão de 60 dias','Sonnet'],
+ ['fausto','Fausto','admfin','Fechamento do cliente e cobrança das contas Meta','Sonnet'],
+ ['caio','Caio','comercial','Prospecção: funil comercial da própria G3989','Sonnet'],
+ ['vitoria','Vitória','comercial','Propostas no modelo Ganha a Ganha','Opus'],
+ ['bento','Bento','comercial','Sucesso do cliente: saúde da carteira, renovação','Sonnet'],
+ ['iris','Iris','atendimento','Prompts das IAs de atendimento e réguas','Sonnet'],
+ ['mnemo','Mnemo','arquivo','Bibliotecário do cérebro: índices e governança','Haiku']
+];
+const ARQ={hermes:'coletores/ (robôs)'};
+const ag={};
+const porSala={};
+A.forEach(([id,nome,sala,papel,modelo])=>{(porSala[sala]=porSala[sala]||[]).push(id);ag[id]={id,nome,sala,papel,modelo,estado:'livre',balao:'',x:0,y:0,mx:0,my:0,tx:0,ty:0,pasta:null}});
+Object.entries(porSala).forEach(([sid,ids])=>{const s=S[sid];const n=ids.length;ids.forEach((id,i)=>{const col=(i+1)/(n+1);const a=ag[id];a.mx=s.x+s.w*col;a.my=s.y+s.h*0.62;a.x=a.tx=a.mx;a.y=a.ty=a.my;});});
+const mesaThiago={x:S.thiago.x+S.thiago.w/2,y:S.thiago.y+S.thiago.h*0.62};
+const COR={livre:'#9fb0d6',trabalhando:'#13bbf1',levando:'#13bbf1',aprovado:'#35d39a',devolvido:'#ff5d73',esperando:'#ffb547',pausado:'#6b7ca6'};
+
+/* Fluxos de exemplo, na ordem real das camadas */
+const fluxos=[
+ {nome:'Diário 7h30',cli:'carteira',autor:'orion',antes:['hermes'],tarefa:'Diário por cliente e bloco Hoje',devolve:null,decisao:'info'},
+ {nome:'Contas a receber',cli:'G3989',autor:'cora',antes:[],tarefa:'Quem pagou, quem deve, NF a emitir',devolve:'tome',decisao:'APROVAR cobrança de 2 clientes'},
+ {nome:'Black Friday',cli:'Delmara',autor:'vetor',antes:[],tarefa:'Plano de trás para frente até 27/11',devolve:null,decisao:'APROVAR oferta e verba'},
+ {nome:'Copy da semana',cli:'Trendyce',autor:'lia',antes:[],tarefa:'3 versões na voz da Trendyce',devolve:'themis',decisao:'APROVAR publicação'},
+ {nome:'Contratos',cli:'carteira',autor:'juno',antes:[],tarefa:'Testes acabando e assinaturas pendentes',devolve:null,decisao:'APROVAR envio de 2 contratos'},
+ {nome:'Pesquisa mensal',cli:'Deitaria',autor:'radar',antes:[],tarefa:'Quem sobreviveu na Biblioteca',devolve:'sofia',decisao:'info'}
+];
+let vel=1, rodando=true, pausaGlobal=false, fila=[], tempo=0, iFluxo=0, aguardando=[];
+const logEl=document.getElementById('log');
+function hora(){const d=new Date();return d.toTimeString().slice(0,5)}
+function log(html,cls){const d=document.createElement('div');d.innerHTML='<span>'+hora()+'</span> '+html;if(cls)d.className=cls;logEl.prepend(d);while(logEl.children.length>40)logEl.lastChild.remove();}
+function ir(id,x,y){const a=ag[id];a.tx=x;a.ty=y;}
+function voltar(id){const a=ag[id];a.tx=a.mx;a.ty=a.my;}
+function passo(fn,ms){fila.push({fn,ms});}
+
+function montar(f){
+  const ex=f.autor, nomeF=f.nome+' · '+f.cli;
+  passo(()=>{ag.atlas.estado='trabalhando';ag.atlas.balao='Abrindo: '+f.nome;log('<em>Atlas</em> abriu '+nomeF);},900);
+  f.antes.forEach(p=>passo(()=>{ag[p].estado='trabalhando';ag[p].balao='Coletando dados';log('<em>'+ag[p].nome+'</em> coletou os dados');},1100));
+  passo(()=>{ag.atlas.estado='livre';ag.atlas.balao='';f.antes.forEach(p=>{ag[p].estado='livre';ag[p].balao=''});ag[ex].estado='trabalhando';ag[ex].balao=f.tarefa;log('<em>'+ag[ex].nome+'</em> está fazendo: '+f.tarefa);},2200);
+  const camadas=['tome','sofia','themis','sentinela'];
+  let anterior=ex;
+  camadas.forEach(c=>{
+    const de=anterior;
+    passo(()=>{const a=ag[de];a.estado='levando';a.pasta=nomeF;ir(de,ag[c].mx,ag[c].my-28);log('<em>'+a.nome+'</em> levou a pasta para <em>'+ag[c].nome+'</em>');},1500);
+    passo(()=>{const a=ag[de];a.pasta=null;a.estado=de===ex?'livre':'aprovado';a.balao='';voltar(de);ag[c].estado='trabalhando';ag[c].balao=c==='tome'?'Refazendo as contas':c==='sofia'?'Revisando a verificação':c==='themis'?'Conformidade':'Segurança';},1700);
+    if(f.devolve===c){
+      passo(()=>{ag[c].estado='devolvido';ag[c].balao='Devolvido ao autor';log('<em>'+ag[c].nome+'</em> devolveu para <em>'+ag[ex].nome+'</em>: ajuste pedido','dev');},1200);
+      passo(()=>{ag[c].estado='livre';ag[c].balao='';ag[ex].estado='trabalhando';ag[ex].balao='Corrigindo (volta 1 de 2)';},1600);
+      passo(()=>{ag[ex].estado='levando';ag[ex].pasta=nomeF;ir(ex,ag[c].mx,ag[c].my-28);log('<em>'+ag[ex].nome+'</em> reenviou para <em>'+ag[c].nome+'</em>');},1400);
+      passo(()=>{ag[ex].pasta=null;ag[ex].estado='livre';ag[ex].balao='';voltar(ex);ag[c].estado='trabalhando';},1500);
+    }
+    passo(()=>{ag[c].estado='aprovado';ag[c].balao='Aprovado';log('<em>'+ag[c].nome+'</em> aprovou','ok');},1000);
+    anterior=c;
+  });
+  passo(()=>{['tome','sofia','themis'].forEach(c=>{ag[c].estado='livre';ag[c].balao=''});ag.sentinela.estado='levando';ag.sentinela.pasta=nomeF;ir('sentinela',ag.clara.mx,ag.clara.my-28);},1500);
+  passo(()=>{ag.sentinela.pasta=null;ag.sentinela.estado='livre';ag.sentinela.balao='';voltar('sentinela');ag.clara.estado='trabalhando';ag.clara.balao='Escrevendo a entrega';log('<em>Clara</em> está consolidando');},1800);
+  passo(()=>{ag.clara.estado='levando';ag.clara.pasta=nomeF;ir('clara',mesaThiago.x+40,mesaThiago.y-10);},1600);
+  passo(()=>{const c=ag.clara;const alvo={x:c.x,y:c.y};
+    if(f.devolve){acaoThiago={tipo:'chicote',t0:tempo,alvo};c.tremer=true;c.balao='Ai! Veio com erro antes';log('<em>Thiago</em> deu uma chicotada: a entrega teve devolução no caminho','dev');}
+    else{acaoThiago={tipo:'abraco',t0:tempo,alvo};c.balao='Certo de primeira!';log('<em>Thiago</em> deu um abraço: entrega certa de primeira','ok');}
+  },2600);
+  passo(()=>{acaoThiago=null;ag.clara.tremer=false;ag.clara.pasta=null;voltar('clara');ag.clara.estado='livre';ag.clara.balao='';
+    if(f.decisao==='info'){log('Entrega na sua mesa: <em>'+nomeF+'</em> (só informação)','ok');aguardando.unshift({t:nomeF,d:'Entregue para leitura',tipo:'info'});}
+    else{log('Entrega na sua mesa: <em>'+nomeF+'</em> pede decisão','esp');aguardando.unshift({t:nomeF,d:f.decisao,tipo:'apr'});}
+    aguardando=aguardando.slice(0,4);desenharMesa();},1400);
+}
+function desenharMesa(){
+  const m=document.getElementById('mesa');
+  if(!aguardando.length){m.innerHTML='<div class="vazio">Nada esperando por você agora.</div>';return;}
+  m.innerHTML=aguardando.map(x=>'<div class="mesa-item"><span class="pill '+(x.tipo==='apr'?'p-apr':'p-info')+'">'+(x.tipo==='apr'?'APROVAR':'LER')+'</span><b>'+x.t+'</b><small>'+x.d+'</small></div>').join('');
+}
+function proxFluxo(){montar(fluxos[iFluxo%fluxos.length]);iFluxo++;}
+
+let espera=0;
+function tick(dt){
+  if(pausaGlobal){return;}
+  if(!fila.length){espera+=dt;if(espera>1500){espera=0;proxFluxo();}return;}
+  fila[0].ms-=dt;
+  if(fila[0].ms<=0){const p=fila.shift();p.fn();}
+}
+function mover(dt){
+  Object.values(ag).forEach(a=>{const dx=a.tx-a.x,dy=a.ty-a.y,d=Math.hypot(dx,dy);const sp=0.22*dt;if(d<=sp||d<0.01){a.x=a.tx;a.y=a.ty}else{a.x+=dx/d*sp;a.y+=dy/d*sp}});
+}
+const PELE=['#f2c9a0','#d9a273','#a8704a','#7a4b2e','#e8b98f'];
+const CABELO=['#2b1d14','#5a3a22','#1a1a1a','#a46a2c','#d8c18a','#3b2a20'];
+function hsh(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h;}
+function cadeira(a){rr(a.mx-14,a.my-24,28,28,7);ctx.fillStyle='#24325c';ctx.fill();}
+function mesa(a){
+  const on=a.estado==='trabalhando'&&Math.hypot(a.x-a.mx,a.y-a.my)<2&&!pausaGlobal;
+  rr(a.mx-32,a.my-2,64,10,3);ctx.fillStyle='#7a5a3c';ctx.fill();
+  ctx.fillStyle='#5a4129';ctx.fillRect(a.mx-30,a.my+8,60,14);
+  // teclado
+  rr(a.mx-12,a.my-1,18,5,1);ctx.fillStyle='#c9d3ea';ctx.fill();
+  // monitor ao lado
+  ctx.fillStyle='#1b2547';ctx.fillRect(a.mx+19,a.my-6,3,6);
+  rr(a.mx+10,a.my-24,22,16,2);ctx.fillStyle=on?'#0f3550':'#0a1124';ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#2c3c6c';ctx.stroke();
+  if(on){ctx.fillStyle='#13bbf1';const f=Math.floor(tempo/180)%4;for(let i=0;i<3;i++){ctx.fillRect(a.mx+13,a.my-21+i*4,6+((i+f)%3)*4,2);}}
+  // caneca
+  ctx.fillStyle='#e8eefc';ctx.fillRect(a.mx-27,a.my-7,5,6);
+}
+function visual(id){
+  const h=hsh(id);
+  return {pele:PELE[h%PELE.length],cab:CABELO[(h>>3)%CABELO.length],estilo:(h>>6)%6,oculos:(h>>9)%4===0,barba:(h>>11)%5===0,olho:['#2b1d14','#3a5a8c','#2f6b3a'][(h>>13)%3]};
+}
+function boneco(a,sentado){
+  const v=visual(a.id),cam=S[a.sala].cor;
+  const x=a.x+(a.tremer?Math.sin(tempo/25)*3:0),y=a.y,c=pausaGlobal?COR.pausado:COR[a.estado]||COR.livre;
+  if(sentado){
+    rr(x-15,y-28,30,30,9);ctx.fillStyle=cam;ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(x-2,y-27,4,10);
+    const dig=a.estado==='trabalhando'&&!pausaGlobal;const o1=dig?Math.sin(tempo/55)*2.5:0,o2=dig?Math.sin(tempo/55+2)*2.5:0;
+    ctx.strokeStyle=cam;ctx.lineWidth=7;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(x-12,y-20);ctx.lineTo(x-8,y-4+o1);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+12,y-20);ctx.lineTo(x+4,y-4+o2);ctx.stroke();
+    ctx.fillStyle=v.pele;ctx.beginPath();ctx.arc(x-8,y-3+o1,3.5,0,7);ctx.fill();ctx.beginPath();ctx.arc(x+4,y-3+o2,3.5,0,7);ctx.fill();
+    cabeca(x,y-42,v,a.estado==='livre'&&!pausaGlobal?Math.sin(tempo/900+hsh(a.id))*2:0,a.estado==='devolvido');
+    ponto(x+16,y-58,c);
+  }else{
+    const sw=Math.sin(tempo/85)*7;
+    ctx.strokeStyle='#22325e';ctx.lineWidth=7;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(x-5,y+2);ctx.lineTo(x-5+sw,y+22);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+5,y+2);ctx.lineTo(x+5-sw,y+22);ctx.stroke();
+    ctx.fillStyle='#111a33';ctx.beginPath();ctx.ellipse(x-5+sw,y+23,5,3,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(x+5-sw,y+23,5,3,0,0,7);ctx.fill();
+    rr(x-13,y-22,26,26,8);ctx.fillStyle=cam;ctx.fill();
+    ctx.strokeStyle=cam;ctx.lineWidth=7;
+    ctx.beginPath();ctx.moveTo(x-12,y-16);ctx.lineTo(x-16-sw/2,y);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+12,y-16);ctx.lineTo(x+17,y-6);ctx.stroke();
+    ctx.fillStyle=v.pele;ctx.beginPath();ctx.arc(x-16-sw/2,y+1,3.5,0,7);ctx.fill();
+    if(a.pasta){rr(x+10,y-16,24,18,3);ctx.fillStyle='#ffd147';ctx.fill();ctx.fillStyle='#c9a227';ctx.fillRect(x+10,y-16,24,4);}
+    cabeca(x,y-36,v,0,false);
+    ponto(x+16,y-52,c);
+  }
+}
+function cabeca(x,y,v,inc,triste){
+  const X=x+inc,R=13;
+  // cabelo de trás (comprido e coque)
+  ctx.fillStyle=v.cab;
+  if(v.estilo===1){rr(X-R-2,y-4,2*R+4,R+10,6);ctx.fill();}
+  if(v.estilo===2){ctx.beginPath();ctx.arc(X,y-R-5,7,0,7);ctx.fill();}
+  // rosto
+  ctx.fillStyle=v.pele;ctx.beginPath();ctx.arc(X,y,R,0,7);ctx.fill();
+  ctx.beginPath();ctx.arc(X-R,y+1,3,0,7);ctx.arc(X+R,y+1,3,0,7);ctx.fill();
+  // cabelo da frente
+  ctx.fillStyle=v.cab;
+  if(v.estilo===0||v.estilo===1||v.estilo===2){ctx.beginPath();ctx.arc(X,y-2,R+1,Math.PI*1.02,Math.PI*1.98);ctx.fill();}
+  if(v.estilo===3){for(let i=0;i<7;i++){const ang=Math.PI*(1.05+i*0.15);ctx.beginPath();ctx.arc(X+Math.cos(ang)*R,y-2+Math.sin(ang)*R,5,0,7);ctx.fill();}}
+  if(v.estilo===5){ctx.beginPath();ctx.arc(X,y-3,R+1,Math.PI*1.1,Math.PI*1.9);ctx.fill();ctx.beginPath();ctx.ellipse(X+3,y-R-2,8,5,-.3,0,7);ctx.fill();}
+  if(v.estilo===4){ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.arc(X-4,y-7,4,0,7);ctx.fill();}
+  // olhos
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X-5,y,3.2,0,7);ctx.arc(X+5,y,3.2,0,7);ctx.fill();
+  ctx.fillStyle=v.olho;ctx.beginPath();ctx.arc(X-4.5,y+.5,1.7,0,7);ctx.arc(X+5.5,y+.5,1.7,0,7);ctx.fill();
+  if(v.oculos){ctx.strokeStyle='#0b1430';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(X-5,y,4.6,0,7);ctx.stroke();ctx.beginPath();ctx.arc(X+5,y,4.6,0,7);ctx.stroke();ctx.beginPath();ctx.moveTo(X-.5,y);ctx.lineTo(X+.5,y);ctx.stroke();}
+  // bochecha e boca
+  ctx.fillStyle='rgba(255,110,130,.35)';ctx.beginPath();ctx.arc(X-8,y+5,2.5,0,7);ctx.arc(X+8,y+5,2.5,0,7);ctx.fill();
+  if(v.barba){ctx.fillStyle=v.cab;ctx.beginPath();ctx.arc(X,y+4,R-1,Math.PI*0.1,Math.PI*0.9);ctx.fill();}
+  ctx.strokeStyle='#5a2a2a';ctx.lineWidth=1.8;ctx.beginPath();
+  if(triste){ctx.arc(X,y+10,3.5,Math.PI*1.15,Math.PI*1.85);}else{ctx.arc(X,y+5,4,Math.PI*0.15,Math.PI*0.85);}
+  ctx.stroke();
+}
+/* Thiago na mesa dele: chicote quando a entrega veio com erro, abraço com coração quando veio certa */
+let acaoThiago=null;
+function desenharThiago(){
+  const v={pele:'#e8b98f',cab:'#2b1d14',estilo:5,oculos:false,barba:true,olho:'#2b1d14'};
+  const bx=mesaThiago.x-62,by=mesaThiago.y;
+  let x=bx,y=by;
+  if(acaoThiago&&acaoThiago.tipo==='abraco'){const k=Math.min(1,(tempo-acaoThiago.t0)/500);x=bx+(acaoThiago.alvo.x-14-bx)*k;y=by+(acaoThiago.alvo.y-by)*k;}
+  // corpo
+  rr(x-15,y-28,30,30,9);ctx.fillStyle='#002861';ctx.fill();ctx.strokeStyle='#13bbf1';ctx.lineWidth=2;ctx.stroke();
+  ctx.lineCap='round';ctx.strokeStyle='#002861';ctx.lineWidth=7;
+  if(acaoThiago&&acaoThiago.tipo==='chicote'){
+    const f=Math.sin((tempo-acaoThiago.t0)/90);
+    ctx.beginPath();ctx.moveTo(x+12,y-20);ctx.lineTo(x+22,y-38+f*6);ctx.stroke();
+    ctx.strokeStyle='#6b3f1e';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x+22,y-38+f*6);
+    ctx.quadraticCurveTo(x+60,y-80+f*30,acaoThiago.alvo.x,acaoThiago.alvo.y-30+f*12);ctx.stroke();
+    if(f>0.6){ctx.fillStyle='#ffd147';ctx.font='800 20px Sora, system-ui, sans-serif';ctx.textAlign='center';ctx.fillText('PÁ!',acaoThiago.alvo.x+10,acaoThiago.alvo.y-70);ctx.textAlign='left';}
+    ctx.strokeStyle='#002861';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(x-12,y-20);ctx.lineTo(x-14,y-4);ctx.stroke();
+  }else if(acaoThiago&&acaoThiago.tipo==='abraco'){
+    ctx.beginPath();ctx.moveTo(x-12,y-20);ctx.quadraticCurveTo(x+10,y-30,x+30,y-14);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+12,y-20);ctx.quadraticCurveTo(x+24,y-8,x+34,y-8);ctx.stroke();
+    const dt=(tempo-acaoThiago.t0);for(let i=0;i<4;i++){const p=((dt/1400)+i*0.25)%1;coracao(x+14+Math.sin(i*2+dt/300)*14,y-60-p*60,7,1-p);}
+  }else{
+    ctx.beginPath();ctx.moveTo(x-12,y-20);ctx.lineTo(x-8,y-4);ctx.stroke();ctx.beginPath();ctx.moveTo(x+12,y-20);ctx.lineTo(x+4,y-4);ctx.stroke();
+  }
+  cabeca(x,y-42,v,0,false);
+  ctx.font='600 11px Sora, system-ui, sans-serif';ctx.fillStyle='#e8eefc';ctx.textAlign='center';ctx.fillText('Thiago',bx,by+38);ctx.textAlign='left';
+}
+function coracao(x,y,s,alfa){ctx.save();ctx.globalAlpha=Math.max(0,alfa);ctx.fillStyle='#ff5d8a';ctx.beginPath();ctx.moveTo(x,y+s*.9);ctx.bezierCurveTo(x-s*1.6,y-s*.2,x-s*.6,y-s*1.4,x,y-s*.4);ctx.bezierCurveTo(x+s*.6,y-s*1.4,x+s*1.6,y-s*.2,x,y+s*.9);ctx.fill();ctx.restore();}
+function ponto(x,y,c){ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fillStyle=c;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#0b1430';ctx.stroke();}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function desenhar(){
+  ctx.fillStyle='#0c1630';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(29,43,79,.55)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  salas.forEach(s=>{
+    rr(s.x,s.y,s.w,s.h,14);ctx.fillStyle='rgba(11,20,48,.92)';ctx.fill();
+    ctx.lineWidth=s.id==='auditoria'?2.5:1.5;ctx.strokeStyle=s.cor;ctx.globalAlpha=.75;ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle=s.cor;ctx.font='600 13px Sora, system-ui, sans-serif';ctx.fillText(s.nome.toUpperCase(),s.x+14,s.y+24);
+    if(s.id==='thiago'){
+      // mesa grande do Thiago com a pilha de pastas
+      rr(mesaThiago.x-70,mesaThiago.y+2,140,22,5);ctx.fillStyle='#5b4632';ctx.fill();
+      for(let i=0;i<Math.min(aguardando.length,4);i++){rr(mesaThiago.x+8+i*14,mesaThiago.y-6-i*4,22,12,2);ctx.fillStyle=aguardando[i].tipo==='apr'?'#ffb547':'#13bbf1';ctx.fill();}
+      ctx.fillStyle='#9fb0d6';ctx.font='12px "IBM Plex Mono", monospace';ctx.textAlign='center';ctx.fillText(aguardando.length+' na mesa',mesaThiago.x+40,mesaThiago.y+42);ctx.textAlign='left';
+    }
+  });
+  // cadeira, boneco e mesa de cada agente (a mesa fica na frente de quem está sentado)
+  Object.values(ag).forEach(a=>{const sentado=Math.hypot(a.x-a.mx,a.y-a.my)<2;cadeira(a);if(sentado)boneco(a,true);mesa(a);});
+  desenharThiago();
+  Object.values(ag).forEach(a=>{if(Math.hypot(a.x-a.mx,a.y-a.my)>=2)boneco(a,false);});
+  if(pausaGlobal){ctx.fillStyle='rgba(7,13,28,.55)';ctx.fillRect(0,0,W,H);}
+  Object.values(ag).forEach(a=>{
+    ctx.font='11px Sora, system-ui, sans-serif';ctx.fillStyle='#9fb0d6';ctx.textAlign='center';ctx.fillText(a.nome,a.mx,a.my+38);
+    if(a.balao&&!pausaGlobal){ctx.font='12px "IBM Plex Mono", monospace';const t=a.balao.length>30?a.balao.slice(0,29)+'…':a.balao;const w=ctx.measureText(t).width+16;const by=a.y-(Math.hypot(a.x-a.mx,a.y-a.my)<2?92:84);rr(a.x-w/2,by,w,22,6);ctx.fillStyle='#e8eefc';ctx.fill();ctx.beginPath();ctx.moveTo(a.x-5,by+22);ctx.lineTo(a.x+5,by+22);ctx.lineTo(a.x,by+28);ctx.fill();ctx.fillStyle='#0b1430';ctx.fillText(t,a.x,by+15);}
+    ctx.textAlign='left';
+  });
+  if(pausaGlobal){ctx.fillStyle='#ffb547';ctx.font='700 22px Sora, system-ui, sans-serif';ctx.textAlign='center';ctx.fillText('PAUSA: todos só leem, ninguém executa',W/2,H/2);ctx.textAlign='left';}
+}
+let ult=performance.now();
+function loop(t){const dt=Math.max(0,Math.min(64,t-ult))*vel;ult=t;if(rodando){tempo+=dt;tick(dt);mover(dt);}desenhar();requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+
+function ficha(a){
+  document.getElementById('ficha').innerHTML='<div class="nome">'+a.nome+'</div><div>'+a.papel+'</div>'+
+   '<div class="linha"><span>Sala</span><span>'+S[a.sala].nome+'</span></div>'+
+   '<div class="linha"><span>Modelo</span><span>'+a.modelo+'</span></div>'+
+   '<div class="linha"><span>Estado</span><span>'+a.estado+'</span></div>'+
+   '<div>Prompt no GitHub: <code>'+(ARQ[a.id]||'.claude/agents/'+a.id+'*.md')+'</code></div>';
+}
+function clique(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};}
+cv.addEventListener('click',e=>{const p=clique(e);let m=null,dm=36;Object.values(ag).forEach(a=>{const d=Math.hypot(a.x-p.x,(a.y-18)-p.y);if(d<dm){dm=d;m=a}});if(m)ficha(m);});
+const bPlay=document.getElementById('bPlay');
+bPlay.onclick=()=>{rodando=!rodando;bPlay.textContent=rodando?'Pausar':'Continuar';bPlay.classList.toggle('on',rodando);bPlay.setAttribute('aria-pressed',rodando);};
+const bVel=document.getElementById('bVel');const vels=[1,2,4];
+bVel.onclick=()=>{vel=vels[(vels.indexOf(vel)+1)%vels.length];bVel.textContent='Velocidade '+vel+'x';};
+const bPausa=document.getElementById('bPausa');
+bPausa.onclick=()=>{pausaGlobal=!pausaGlobal;bPausa.classList.toggle('on',pausaGlobal);bPausa.setAttribute('aria-pressed',pausaGlobal);log(pausaGlobal?'Arquivo PAUSA criado: ninguém executa':'PAUSA removida: fluxos voltaram',pausaGlobal?'esp':'ok');};
+if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){vel=4;}
+ficha(ag.atlas);
+log('Escritório aberto. Simulação dos fluxos reais em sequência.');
+proxFluxo();
+};
+</script>
+
+<div id="porta" class="porta"><div class="caixa"><h2>Escritório G3989</h2><p id="portaMsg">Conferindo seu acesso…</p><a href="/" class="lnk">Entrar pelo Sistema</a></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../config.js"></script>
+<script>
+(function(){
+  var C=window.G3989, sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey);
+  var wrap=document.querySelector('.wrap'); wrap.hidden=true;
+  sb.auth.getSession().then(function(r){
+    var s=r.data.session, e=s&&String(s.user.email||'').toLowerCase();
+    if(s && e===String(C.email).toLowerCase()){ document.getElementById('porta').hidden=true; wrap.hidden=false; window.iniciarEscritorio(); }
+    else { document.getElementById('portaMsg').textContent = s ? 'Este escritório é só do Thiago.' : 'Entre no Sistema G3989 primeiro; depois volte para esta página.'; }
+  });
+})();
+</script>
+</body>
+</html>
