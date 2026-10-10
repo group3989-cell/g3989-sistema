@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Consumo G3989</title>
+<link rel="icon" href="../assets/logo-azul.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Painel de consumo: limites do plano Max, gasto por agente e crédito de API. Visual escuro, igual ao escritório. */
+:root{color-scheme:dark;--bg:#070d1c;--piso:#0c1630;--linha:#1d2b4f;--fg:#e8eefc;--fg2:#9fb0d6;--fg3:#6b7ca6;--ciano:#13bbf1;--ok:#35d39a;--alerta:#ffb547;--erro:#ff5d73;--f:'Sora',system-ui,sans-serif;--m:'IBM Plex Mono',ui-monospace,monospace}
+*{box-sizing:border-box}html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);margin:0}
+.wrap{padding-block:16px;padding-inline:16px;max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{margin:0;font-size:22px}h1 span{color:var(--ciano)}
+.sub{color:var(--fg2);font-size:13px;margin-top:4px}
+a.lk{color:var(--ciano);font-size:13px}
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.cx{background:#0b1430;border:1px solid var(--linha);border-radius:14px;padding:14px;min-width:0}
+.cx h2{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2)}
+.big{font:700 34px/1 var(--f);font-variant-numeric:tabular-nums}
+.barra{height:10px;background:#16244d;border-radius:99px;overflow:hidden;margin:10px 0 6px}
+.barra i{display:block;height:100%;border-radius:99px;background:var(--ok)}
+.b-ok i{background:var(--ok)}.b-al i{background:var(--alerta)}.b-er i{background:var(--erro)}
+.meta{display:flex;justify-content:space-between;font:12px var(--m);color:var(--fg2)}
+.aviso{border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.45;border:1px solid}
+.a-ok{border-color:#1f5a44;background:#0a2a1f;color:#bff3dc}.a-al{border-color:#6b5320;background:#2b2210;color:#ffe2a6}.a-er{border-color:#6b2434;background:#2a0f16;color:#ffc9d1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--linha);text-align:left}
+th{color:var(--fg3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+td.n,th.n{text-align:right;font:13px var(--m);font-variant-numeric:tabular-nums}
+.vazio{color:var(--fg3);font-size:13px}
+.porta{min-height:100%;display:grid;place-items:center;padding:16px}.porta .caixa{max-width:380px;text-align:center}.lnk{display:inline-block;margin-top:10px;color:var(--ciano)}
+[hidden]{display:none!important}
+.regra{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;line-height:1.5}.regra b{font:600 13px var(--m);color:var(--ciano)}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap" hidden>
+  <header>
+    <div><h1>Consumo <span>G3989</span></h1><div class="sub" id="sub">Limites do plano, gasto dos agentes e crédito de API.</div></div>
+    <a class="lk" href="/escritorio/">Escritório</a>
+  </header>
+  <div id="avisos"></div>
+  <div class="grade" id="janelas"></div>
+  <div class="grade">
+    <div class="cx"><h2>Crédito de API do mês (agentes no GitHub)</h2><div id="api"></div></div>
+    <div class="cx"><h2>Regra de custo-benefício</h2>
+      <div class="regra">
+        <b>até 60%</b><span>uso normal, modelo pela tarefa (Haiku no mecânico, Sonnet no padrão, Opus só em auditoria e plano)</span>
+        <b>60 a 80%</b><span>sem agentes em paralelo; trabalho pesado só no modelo com limite próprio (Fable)</span>
+        <b>80 a 95%</b><span>só operação simples; o resto espera o limite zerar</span>
+        <b>95% ou mais</b><span>parar. Ligar uso extra só se o trabalho não puder esperar (cobra à parte)</span>
+      </div>
+    </div>
+  </div>
+  <div class="grade">
+    <div class="cx"><h2>Gasto por agente (mês, crédito de API)</h2><div id="agentes"></div></div>
+    <div class="cx"><h2>Últimas medições do plano</h2><div id="hist"></div></div>
+  </div>
+</div>
+<div id="porta" class="porta"><div class="caixa"><h2>Consumo G3989</h2><p id="portaMsg">Conferindo seu acesso…</p><a href="/" class="lnk">Entrar pelo Sistema</a></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../config.js"></script>
+<script>
+(function(){
+  var C=window.G3989, sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey);
+  var CREDITO_API=100; /* US$ por mês do Max 5x */
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function quando(iso){if(!iso)return '';var d=new Date(iso);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toTimeString().slice(0,5);}
+  function faltam(iso){if(!iso)return '';var ms=new Date(iso)-new Date();if(ms<=0)return 'zerou';var h=Math.floor(ms/36e5),m=Math.floor(ms%36e5/6e4);return 'zera em '+(h?h+'h ':'')+m+'min';}
+  function classe(p){return p>=95?'er':p>=80?'al':p>=60?'al':'ok';}
+  function rotulo(j){return {'5h':'Janela de 5 horas','semanal':'Semanal, todos os modelos','semanal_fable':'Semanal, só o Fable'}[j]||j;}
+  function render(med,trilha){
+    var ult={};med.forEach(function(r){if(!ult[r.janela]||new Date(r.medido_em)>new Date(ult[r.janela].medido_em))ult[r.janela]=r;});
+    var ordem=['5h','semanal','semanal_fable'],cards='',avisos='',pior=0,ultMed=null;
+    ordem.concat(Object.keys(ult).filter(function(k){return ordem.indexOf(k)<0})).forEach(function(j){
+      var r=ult[j];if(!r)return;ultMed=ultMed||r;var p=r.percentual,cl=classe(p);if(j==='semanal')pior=p;
+      cards+='<div class="cx"><h2>'+esc(rotulo(j))+'</h2><div class="big">'+p+'%</div><div class="barra b-'+cl+'"><i style="width:'+Math.min(100,p)+'%"></i></div><div class="meta"><span>'+esc(faltam(r.zera_em))+'</span><span>medido '+esc(quando(r.medido_em))+'</span></div></div>';
+    });
+    if(!Object.keys(ult).length){cards='<div class="cx vazio">Ainda sem medição. O Claude grava a cada sessão.</div>';}
+    var sem=ult.semanal,fab=ult.semanal_fable;
+    if(sem){
+      if(sem.percentual>=95)avisos='<div class="aviso a-er">🔴 Semanal em '+sem.percentual+'%. Parar o trabalho pesado até '+esc(quando(sem.zera_em))+'. '+(fab&&fab.percentual<60?'O Fable ainda tem '+(100-fab.percentual)+'% de limite próprio: use ele.':'')+' Uso extra está '+(sem.uso_extra?'ligado':'desligado')+'.</div>';
+      else if(sem.percentual>=70)avisos='<div class="aviso a-al">🟡 Semanal em '+sem.percentual+'%. Sem agentes em paralelo; o pesado vai para o modelo com limite próprio.</div>';
+      else avisos='<div class="aviso a-ok">🟢 Plano no ritmo. Semanal em '+sem.percentual+'%, zera '+esc(quando(sem.zera_em))+'.</div>';
+    }
+    document.getElementById('avisos').innerHTML=avisos;document.getElementById('janelas').innerHTML=cards;
+    if(ultMed)document.getElementById('sub').textContent='Plano '+(ultMed.plano||'Max')+'. Última medição '+quando(ultMed.medido_em)+(ultMed.modelo_sessao?', sessão no '+ultMed.modelo_sessao:'')+(ultMed.contexto_pct!=null?', contexto da sessão em '+ultMed.contexto_pct+'%':'')+'.';
+    var porAg={},total=0;trilha.forEach(function(t){var c=Number(t.custo)||0;total+=c;var a=t.agente||'?';porAg[a]=(porAg[a]||0)+c;});
+    var pctApi=Math.round(total/CREDITO_API*100);
+    document.getElementById('api').innerHTML='<div class="big">US$ '+total.toFixed(2)+'</div><div class="barra b-'+classe(pctApi)+'"><i style="width:'+Math.min(100,pctApi)+'%"></i></div><div class="meta"><span>de US$ '+CREDITO_API+' no mês</span><span>'+(trilha.length?trilha.length+' passos registrados':'sem custo gravado ainda')+'</span></div><p class="vazio" style="margin:8px 0 0">O custo entra quando os agentes rodarem no GitHub com a chave da API (fase 2). Enquanto rodam aqui no app, gastam o plano Max, não o crédito.</p>';
+    var linhas=Object.keys(porAg).sort(function(a,b){return porAg[b]-porAg[a]}).map(function(a){return '<tr><td>'+esc(a)+'</td><td class="n">'+porAg[a].toFixed(2)+'</td></tr>'}).join('');
+    document.getElementById('agentes').innerHTML=linhas?'<table><tr><th>Agente</th><th class="n">US$</th></tr>'+linhas+'</table>':'<div class="vazio">Nenhum gasto de API neste mês.</div>';
+    var h=med.slice(0,12).map(function(r){return '<tr><td>'+esc(quando(r.medido_em))+'</td><td>'+esc(rotulo(r.janela))+'</td><td class="n">'+r.percentual+'%</td><td>'+esc(r.modelo_sessao||'')+'</td></tr>'}).join('');
+    document.getElementById('hist').innerHTML=h?'<table><tr><th>Quando</th><th>Janela</th><th class="n">Uso</th><th>Modelo</th></tr>'+h+'</table>':'<div class="vazio">Sem medições.</div>';
+  }
+  function carregar(){
+    var ini=new Date();ini.setDate(1);ini.setHours(0,0,0,0);
+    Promise.all([
+      sb.from('consumo_plano').select('*').order('medido_em',{ascending:false}).limit(60),
+      sb.from('trilha_agentes').select('agente,custo').gte('ocorrido_em',ini.toISOString()).limit(2000)
+    ]).then(function(r){
+      if(r[0].error){document.getElementById('avisos').innerHTML='<div class="aviso a-er">Falta rodar o SQL 010 no Supabase.</div>';return;}
+      render(r[0].data||[],r[1].error?[]:(r[1].data||[]));
+    });
+  }
+  sb.auth.getSession().then(function(r){
+    var s=r.data.session,e=s&&String(s.user.email||'').toLowerCase();
+    if(s&&e===String(C.email).toLowerCase()){document.getElementById('porta').hidden=true;document.getElementById('wrap').hidden=false;carregar();setInterval(carregar,60000);}
+    else{document.getElementById('portaMsg').textContent=s?'Esta tela é só do Thiago.':'Entre no Sistema G3989 primeiro; depois volte para esta página.';}
+  });
+})();
+</script>
+</body>
+</html>

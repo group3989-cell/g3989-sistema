@@ -55,6 +55,24 @@ aside{display:flex;flex-direction:column;gap:14px;min-width:0}
 .ficha code{font:12px var(--f-mono);color:var(--ciano);word-break:break-all}
 .legenda{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--fg2)}
 .legenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+
+.mesa-item{cursor:pointer}.mesa-item:hover{border-color:var(--ciano)}
+.modal{position:fixed;inset:0;background:rgba(7,13,28,.84);display:grid;place-items:center;padding:12px;z-index:50}
+.mBox{background:#0b1430;border:1px solid var(--linha);border-radius:14px;width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.mTopo{display:flex;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--linha);align-items:flex-start}
+.mTopo h3{margin:2px 0 4px;font-size:16px}.mig{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2)}.meta2{font:12px var(--f-mono);color:var(--fg2)}
+.pbar{height:6px;background:#16244d;border-radius:99px;width:260px;max-width:100%;overflow:hidden;margin-top:6px}.pbar i{display:block;height:100%;background:var(--ok)}
+.mGrade{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:0;flex:1}
+@media(max-width:800px){.mGrade{grid-template-columns:1fr}.mLista{max-height:150px;border-right:0;border-bottom:1px solid var(--linha)}}
+.mLista{overflow:auto;border-right:1px solid var(--linha);display:flex;flex-direction:column}
+.mi{text-align:left;font:12px var(--f-disp);color:var(--fg2);background:none;border:0;border-bottom:1px solid #121d3d;padding:9px 12px;cursor:pointer;border-radius:0}
+.mi.sel{background:#13224a;color:var(--fg)}.mi.ok{color:var(--ok)}.mi.ok::before{content:'✓ '}
+.mPergunta{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.mCli{font:500 12px var(--f-mono);color:var(--ciano)}.mTxt{font-size:16px;line-height:1.5;text-wrap:balance}
+.mOps{display:flex;flex-wrap:wrap;gap:8px}
+textarea{width:100%;background:#070d1c;color:var(--fg);border:1px solid var(--linha);border-radius:8px;padding:10px;font:14px var(--f-disp)}
+.mAcoes{display:flex;flex-wrap:wrap;gap:8px}.bt{font:600 12px var(--f-disp);color:var(--fg);background:#13224a;border:1px solid var(--linha);border-radius:8px;padding:9px 12px;cursor:pointer}.bt.pri{background:var(--ciano);color:#00203f;border-color:var(--ciano)}
+.mOk{font:12px var(--f-mono);color:var(--ok)}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 .porta{min-height:100%;display:grid;place-items:center;padding:16px}.porta .caixa{max-width:380px;text-align:center}.lnk{display:inline-block;margin-top:10px;color:var(--ciano)}
 [hidden]{display:none!important}
@@ -104,6 +122,10 @@ aside{display:flex;flex-direction:column;gap:14px;min-width:0}
   </div>
 </div>
 
+<div id="modal" class="modal" hidden><div class="mBox">
+  <div class="mTopo"><div><div class="mig">Mesa do Thiago</div><h3 id="mTitulo"></h3><div class="meta2" id="mProg"></div><div class="pbar"><i id="mBarra"></i></div></div><button class="bt" id="mFechar">Fechar</button></div>
+  <div class="mGrade"><div class="mLista" id="mLista"></div><div class="mPergunta" id="mPergunta"></div></div>
+</div></div>
 <script>
 window.iniciarEscritorio=function(){
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -191,7 +213,8 @@ function animar(e){
 function desenharMesa(){
   const m=document.getElementById('mesa');
   if(!aguardando.length){m.innerHTML='<div class="vazio">Nada esperando por você agora.</div>';return;}
-  m.innerHTML=aguardando.map(x=>'<div class="mesa-item"><span class="pill '+(x.tipo==='apr'?'p-apr':'p-info')+'">'+(x.tipo==='apr'?'APROVAR':'LER')+'</span><b>'+x.t+'</b><small>'+x.d+'</small></div>').join('');
+  m.innerHTML=aguardando.map(x=>'<div class="mesa-item" data-ent="'+x.id+'" title="Abrir e responder"><span class="pill '+(x.tipo==='apr'?'p-apr':'p-info')+'">'+(x.tipo==='apr'?'APROVAR':'LER')+'</span><b>'+x.t+'</b><small>'+x.d+' · toque para abrir</small></div>').join('');
+  m.querySelectorAll('[data-ent]').forEach(el=>el.onclick=()=>abrirEntrega(+el.dataset.ent));
 }
 function tick(dt){
   if(pausaGlobal||!fila.length)return;
@@ -347,7 +370,7 @@ function ficha(a){
    '<div>Prompt no GitHub: <code>'+(ARQ[a.id]||'.claude/agents/'+a.id+'*.md')+'</code></div>';
 }
 function clique(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};}
-cv.addEventListener('click',e=>{const p=clique(e);let m=null,dm=36;Object.values(ag).forEach(a=>{const d=Math.hypot(a.x-p.x,(a.y-18)-p.y);if(d<dm){dm=d;m=a}});if(m)ficha(m);});
+cv.addEventListener('click',e=>{const p=clique(e);const st=S.thiago;if(p.x>=st.x&&p.x<=st.x+st.w&&p.y>=st.y&&p.y<=st.y+st.h){if(aguardando.length)abrirEntrega(aguardando[0].id);else log('Nada na sua mesa agora');return;}let m=null,dm=36;Object.values(ag).forEach(a=>{const d=Math.hypot(a.x-p.x,(a.y-18)-p.y);if(d<dm){dm=d;m=a}});if(m)ficha(m);});
 const bPlay=document.getElementById('bPlay');
 bPlay.onclick=()=>{rodando=!rodando;bPlay.textContent=rodando?'Pausar':'Continuar';bPlay.classList.toggle('on',rodando);bPlay.setAttribute('aria-pressed',rodando);};
 const bVel=document.getElementById('bVel');const vels=[1,2,4];
@@ -355,6 +378,58 @@ bVel.onclick=()=>{vel=vels[(vels.indexOf(vel)+1)%vels.length];bVel.textContent='
 const bPausa=document.getElementById('bPausa');
 bPausa.onclick=()=>{pausaGlobal=!pausaGlobal;bPausa.classList.toggle('on',pausaGlobal);bPausa.setAttribute('aria-pressed',pausaGlobal);log(pausaGlobal?'Tela pausada (para parar os agentes de verdade, crie 10-agentes/PAUSA no GitHub)':'Tela retomada',pausaGlobal?'esp':'ok');};
 if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){vel=4;}
+
+/* Mesa do Thiago: abre uma entrega e responde as perguntas uma a uma (grava em entregas_itens) */
+function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+const painel={ent:null,itens:[],i:0};
+async function abrirEntrega(id){
+  const sb=window.__sb;
+  const e=await sb.from('entregas_agentes').select('*').eq('id',id).single();
+  const it=await sb.from('entregas_itens').select('*').eq('entrega_id',id).order('ordem');
+  if(e.error||it.error){log('Não consegui abrir a entrega: '+escH((e.error||it.error).message),'dev');return;}
+  painel.ent=e.data;painel.itens=it.data||[];
+  const prim=painel.itens.findIndex(x=>x.situacao==='aguardando');painel.i=prim<0?0:prim;
+  document.getElementById('modal').hidden=false;desenharPainel();
+}
+function desenharPainel(){
+  const P=painel,n=P.itens.length,resp=P.itens.filter(x=>x.situacao==='respondido').length;
+  document.getElementById('mTitulo').textContent=P.ent.titulo;
+  document.getElementById('mProg').textContent=n?resp+' de '+n+' respondidas':'sem perguntas';
+  document.getElementById('mBarra').style.width=(n?resp/n*100:0)+'%';
+  const lista=document.getElementById('mLista');
+  lista.innerHTML=P.itens.map((x,k)=>'<button class="mi'+(k===P.i?' sel':'')+(x.situacao==='respondido'?' ok':'')+'" data-k="'+k+'">'+(k+1)+'. '+escH(((x.cliente?x.cliente+': ':'')+x.pergunta).slice(0,64))+'</button>').join('');
+  lista.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{P.i=+b.dataset.k;desenharPainel();});
+  const x=P.itens[P.i],q=document.getElementById('mPergunta');
+  if(!x){q.innerHTML='<div class="vazio">'+escH(P.ent.resumo||'Sem perguntas nesta entrega.')+'</div><div class="mAcoes"><button class="bt pri" id="mLido">Marcar como lida</button></div>';document.getElementById('mLido').onclick=()=>concluir('lido');return;}
+  const ops=Array.isArray(x.opcoes)?x.opcoes:[];
+  q.innerHTML='<div class="mCli">'+escH(x.cliente||'Geral')+' · pergunta '+(P.i+1)+' de '+n+'</div><div class="mTxt">'+escH(x.pergunta)+'</div>'+
+    '<div class="mOps">'+ops.map(o=>'<button class="bt op" data-op="'+escH(o)+'">'+escH(o)+'</button>').join('')+'</div>'+
+    '<textarea id="mResp" rows="3" placeholder="Sua resposta, pode ser curta">'+escH(x.resposta||'')+'</textarea>'+
+    '<div class="mAcoes"><button class="bt pri" id="mSalvar">Responder e ir para a próxima</button><button class="bt" id="mPular">Deixar para depois</button><button class="bt" id="mAnt">Anterior</button></div>'+
+    (x.situacao==='respondido'?'<div class="mOk">Respondida em '+new Date(x.respondido_em).toLocaleString('pt-BR')+'. Pode trocar a resposta e salvar de novo.</div>':'');
+  q.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{const t=document.getElementById('mResp');t.value=(t.value?t.value+' ':'')+b.dataset.op;t.focus();});
+  document.getElementById('mSalvar').onclick=()=>salvarItem(x,document.getElementById('mResp').value.trim());
+  document.getElementById('mPular').onclick=()=>{P.i=Math.min(n-1,P.i+1);desenharPainel();};
+  document.getElementById('mAnt').onclick=()=>{P.i=Math.max(0,P.i-1);desenharPainel();};
+}
+async function salvarItem(x,resp){
+  if(!resp){document.getElementById('mResp').focus();return;}
+  const sb=window.__sb,agora=new Date().toISOString();
+  const r=await sb.from('entregas_itens').update({resposta:resp,situacao:'respondido',respondido_em:agora}).eq('id',x.id);
+  if(r.error){log('Não salvou: '+escH(r.error.message),'dev');return;}
+  x.resposta=resp;x.situacao='respondido';x.respondido_em=agora;
+  log('Você respondeu a pergunta '+(painel.i+1)+' de '+escH(painel.ent.titulo),'ok');
+  let prox=painel.itens.findIndex((y,k)=>k>painel.i&&y.situacao==='aguardando');
+  if(prox<0)prox=painel.itens.findIndex(y=>y.situacao==='aguardando');
+  if(prox>=0){painel.i=prox;desenharPainel();}else{await concluir('aprovado');}
+}
+async function concluir(sit){
+  const sb=window.__sb;await sb.from('entregas_agentes').update({situacao:sit}).eq('id',painel.ent.id);
+  log('Entrega '+escH(painel.ent.titulo)+(sit==='lido'?' marcada como lida.':' respondida por completo. O Claude segue daqui.'),'ok');
+  aguardando=aguardando.filter(a=>a.id!==painel.ent.id);desenharMesa();document.getElementById('modal').hidden=true;
+}
+document.getElementById('mFechar').onclick=()=>{document.getElementById('modal').hidden=true;};
+
 ficha(ag.atlas);
 /* leitura do Sistema: eventos novos a cada 20 s; ao abrir, revê os de hoje */
 let ultimo=0;
@@ -368,7 +443,7 @@ async function buscar(primeira){
   if(r.error){selo('Falta rodar o SQL 009 no Supabase para ligar o escritório','#ff5d73');return;}
   (r.data||[]).forEach(e=>{ultimo=Math.max(ultimo,e.id);animar(e);});
   const en=await sb.from('entregas_agentes').select('*').eq('situacao','aguardando').order('criado_em',{ascending:false}).limit(6);
-  if(!en.error){aguardando=(en.data||[]).map(x=>({t:x.titulo,d:x.resumo||x.decisao||'',tipo:x.decisao==='APROVAR'?'apr':'info'}));desenharMesa();}
+  if(!en.error){aguardando=(en.data||[]).map(x=>({id:x.id,t:x.titulo,d:x.resumo||x.decisao||'',tipo:x.decisao==='APROVAR'?'apr':'info'}));desenharMesa();}
   selo('AO VIVO · '+ultimo+' eventos registrados · atualiza a cada 20 s','#35d39a');
 }
 document.getElementById('bRever').onclick=()=>{fila=[];ultimo=0;Object.values(ag).forEach(a=>{a.estado='livre';a.balao='';a.pasta=null;voltar(a.id)});log('Revendo o dia');buscar(true);};
