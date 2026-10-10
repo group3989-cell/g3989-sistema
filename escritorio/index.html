@@ -67,12 +67,13 @@ aside{display:flex;flex-direction:column;gap:14px;min-width:0}
   <header>
     <div>
       <h1>Escritório <span>G3989</span></h1>
-      <div class="sub">24 agentes em 13 salas. Todo trabalho anda de mesa em mesa: autor, Tomé, Sofia, Themis e Sentinela, Clara e, por fim, você.</div>
+      <div class="sub">24 agentes em 13 salas. O que você vê aqui é o que os agentes registraram de verdade, em ordem.</div>
     </div>
     <div class="ctrl">
-      <span class="selo" id="selo">SIMULAÇÃO dos fluxos reais (a trilha do GitHub entra na fase 8)</span>
+      <span class="selo" id="selo">Conectando ao Sistema…</span>
       <button id="bPlay" class="on" aria-pressed="true">Pausar</button>
       <button id="bVel">Velocidade 1x</button>
+      <button id="bRever">Rever o dia</button>
       <button id="bPausa" aria-pressed="false">Botão PAUSA</button>
     </div>
   </header>
@@ -157,66 +158,43 @@ Object.entries(porSala).forEach(([sid,ids])=>{const s=S[sid];const n=ids.length;
 const mesaThiago={x:S.thiago.x+S.thiago.w/2,y:S.thiago.y+S.thiago.h*0.62};
 const COR={livre:'#9fb0d6',trabalhando:'#13bbf1',levando:'#13bbf1',aprovado:'#35d39a',devolvido:'#ff5d73',esperando:'#ffb547',pausado:'#6b7ca6'};
 
-/* Fluxos de exemplo, na ordem real das camadas */
-const fluxos=[
- {nome:'Diário 7h30',cli:'carteira',autor:'orion',antes:['hermes'],tarefa:'Diário por cliente e bloco Hoje',devolve:null,decisao:'info'},
- {nome:'Contas a receber',cli:'G3989',autor:'cora',antes:[],tarefa:'Quem pagou, quem deve, NF a emitir',devolve:'tome',decisao:'APROVAR cobrança de 2 clientes'},
- {nome:'Black Friday',cli:'Delmara',autor:'vetor',antes:[],tarefa:'Plano de trás para frente até 27/11',devolve:null,decisao:'APROVAR oferta e verba'},
- {nome:'Copy da semana',cli:'Trendyce',autor:'lia',antes:[],tarefa:'3 versões na voz da Trendyce',devolve:'themis',decisao:'APROVAR publicação'},
- {nome:'Contratos',cli:'carteira',autor:'juno',antes:[],tarefa:'Testes acabando e assinaturas pendentes',devolve:null,decisao:'APROVAR envio de 2 contratos'},
- {nome:'Pesquisa mensal',cli:'Deitaria',autor:'radar',antes:[],tarefa:'Quem sobreviveu na Biblioteca',devolve:'sofia',decisao:'info'}
-];
-let vel=1, rodando=true, pausaGlobal=false, fila=[], tempo=0, iFluxo=0, aguardando=[];
+/* Modo real: anima os eventos gravados pelos agentes na tabela trilha_agentes do Sistema */
+let vel=1, rodando=true, pausaGlobal=false, fila=[], tempo=0, aguardando=[];
 const logEl=document.getElementById('log');
-function hora(){const d=new Date();return d.toTimeString().slice(0,5)}
-function log(html,cls){const d=document.createElement('div');d.innerHTML='<span>'+hora()+'</span> '+html;if(cls)d.className=cls;logEl.prepend(d);while(logEl.children.length>40)logEl.lastChild.remove();}
+function hora(d){d=d?new Date(d):new Date();return d.toTimeString().slice(0,5)}
+function log(html,cls,quando){const d=document.createElement('div');d.innerHTML='<span>'+hora(quando)+'</span> '+html;if(cls)d.className=cls;logEl.prepend(d);while(logEl.children.length>60)logEl.lastChild.remove();}
 function ir(id,x,y){const a=ag[id];a.tx=x;a.ty=y;}
 function voltar(id){const a=ag[id];a.tx=a.mx;a.ty=a.my;}
 function passo(fn,ms){fila.push({fn,ms});}
-
-function montar(f){
-  const ex=f.autor, nomeF=f.nome+' · '+f.cli;
-  passo(()=>{ag.atlas.estado='trabalhando';ag.atlas.balao='Abrindo: '+f.nome;log('<em>Atlas</em> abriu '+nomeF);},900);
-  f.antes.forEach(p=>passo(()=>{ag[p].estado='trabalhando';ag[p].balao='Coletando dados';log('<em>'+ag[p].nome+'</em> coletou os dados');},1100));
-  passo(()=>{ag.atlas.estado='livre';ag.atlas.balao='';f.antes.forEach(p=>{ag[p].estado='livre';ag[p].balao=''});ag[ex].estado='trabalhando';ag[ex].balao=f.tarefa;log('<em>'+ag[ex].nome+'</em> está fazendo: '+f.tarefa);},2200);
-  const camadas=['tome','sofia','themis','sentinela'];
-  let anterior=ex;
-  camadas.forEach(c=>{
-    const de=anterior;
-    passo(()=>{const a=ag[de];a.estado='levando';a.pasta=nomeF;ir(de,ag[c].mx,ag[c].my-28);log('<em>'+a.nome+'</em> levou a pasta para <em>'+ag[c].nome+'</em>');},1500);
-    passo(()=>{const a=ag[de];a.pasta=null;a.estado=de===ex?'livre':'aprovado';a.balao='';voltar(de);ag[c].estado='trabalhando';ag[c].balao=c==='tome'?'Refazendo as contas':c==='sofia'?'Revisando a verificação':c==='themis'?'Conformidade':'Segurança';},1700);
-    if(f.devolve===c){
-      passo(()=>{ag[c].estado='devolvido';ag[c].balao='Devolvido ao autor';log('<em>'+ag[c].nome+'</em> devolveu para <em>'+ag[ex].nome+'</em>: ajuste pedido','dev');},1200);
-      passo(()=>{ag[c].estado='livre';ag[c].balao='';ag[ex].estado='trabalhando';ag[ex].balao='Corrigindo (volta 1 de 2)';},1600);
-      passo(()=>{ag[ex].estado='levando';ag[ex].pasta=nomeF;ir(ex,ag[c].mx,ag[c].my-28);log('<em>'+ag[ex].nome+'</em> reenviou para <em>'+ag[c].nome+'</em>');},1400);
-      passo(()=>{ag[ex].pasta=null;ag[ex].estado='livre';ag[ex].balao='';voltar(ex);ag[c].estado='trabalhando';},1500);
-    }
-    passo(()=>{ag[c].estado='aprovado';ag[c].balao='Aprovado';log('<em>'+ag[c].nome+'</em> aprovou','ok');},1000);
-    anterior=c;
-  });
-  passo(()=>{['tome','sofia','themis'].forEach(c=>{ag[c].estado='livre';ag[c].balao=''});ag.sentinela.estado='levando';ag.sentinela.pasta=nomeF;ir('sentinela',ag.clara.mx,ag.clara.my-28);},1500);
-  passo(()=>{ag.sentinela.pasta=null;ag.sentinela.estado='livre';ag.sentinela.balao='';voltar('sentinela');ag.clara.estado='trabalhando';ag.clara.balao='Escrevendo a entrega';log('<em>Clara</em> está consolidando');},1800);
-  passo(()=>{ag.clara.estado='levando';ag.clara.pasta=nomeF;ir('clara',mesaThiago.x+40,mesaThiago.y-10);},1600);
-  passo(()=>{const c=ag.clara;const alvo={x:c.x,y:c.y};
-    if(f.devolve){acaoThiago={tipo:'chicote',t0:tempo,alvo};c.tremer=true;c.balao='Ai! Veio com erro antes';log('<em>Thiago</em> deu uma chicotada: a entrega teve devolução no caminho','dev');}
-    else{acaoThiago={tipo:'abraco',t0:tempo,alvo};c.balao='Certo de primeira!';log('<em>Thiago</em> deu um abraço: entrega certa de primeira','ok');}
-  },2600);
-  passo(()=>{acaoThiago=null;ag.clara.tremer=false;ag.clara.pasta=null;voltar('clara');ag.clara.estado='livre';ag.clara.balao='';
-    if(f.decisao==='info'){log('Entrega na sua mesa: <em>'+nomeF+'</em> (só informação)','ok');aguardando.unshift({t:nomeF,d:'Entregue para leitura',tipo:'info'});}
-    else{log('Entrega na sua mesa: <em>'+nomeF+'</em> pede decisão','esp');aguardando.unshift({t:nomeF,d:f.decisao,tipo:'apr'});}
-    aguardando=aguardando.slice(0,4);desenharMesa();},1400);
+const ALIAS={claude:'atlas','tomé':'tome','vitória':'vitoria'};
+function idDe(n){n=String(n||'').toLowerCase().trim();n=ALIAS[n]||n;return ag[n]?n:null;}
+const comDevolucao=new Set();
+function curto(t){t=String(t||'');return t.length>60?t.slice(0,58)+'…':t;}
+function animar(e){
+  const id=idDe(e.agente)||'atlas', a=ag[id], para=String(e.para||'').toLowerCase(), est=e.estado;
+  const rot=e.fluxo+(e.resumo?': '+curto(e.resumo):'');
+  if(est==='reprovado'||est==='devolvido')comDevolucao.add(e.fluxo);
+  passo(()=>{a.estado='trabalhando';a.balao=curto(e.resumo)||e.fluxo;log('<em>'+a.nome+'</em> '+(est==='reprovado'?'reprovou':est==='aprovado'?'aprovou':'trabalhou em')+' '+rot,est==='reprovado'?'dev':est==='aprovado'?'ok':'',e.ocorrido_em);},2200);
+  if(para==='thiago'){
+    passo(()=>{a.estado='levando';a.pasta=e.fluxo;ir(id,mesaThiago.x+40,mesaThiago.y-10);},1800);
+    passo(()=>{const alvo={x:a.x,y:a.y};if(comDevolucao.has(e.fluxo)){acaoThiago={tipo:'chicote',t0:tempo,alvo};a.tremer=true;a.balao='Ai! Teve erro no caminho';}else{acaoThiago={tipo:'abraco',t0:tempo,alvo};a.balao='Certo de primeira!';}},2600);
+    passo(()=>{acaoThiago=null;a.tremer=false;a.pasta=null;a.estado='livre';a.balao='';voltar(id);},1400);
+  }else if(idDe(para)&&idDe(para)!==id){
+    const p=idDe(para);
+    passo(()=>{a.estado='levando';a.pasta=e.fluxo;ir(id,ag[p].mx,ag[p].my-28);},1800);
+    passo(()=>{a.pasta=null;a.estado=(est==='reprovado'||est==='devolvido')?'devolvido':'aprovado';a.balao=est==='reprovado'?'Devolvido':'Entregue';voltar(id);},1400);
+    passo(()=>{a.estado='livre';a.balao='';},600);
+  }else{
+    passo(()=>{a.estado='livre';a.balao='';},600);
+  }
 }
 function desenharMesa(){
   const m=document.getElementById('mesa');
   if(!aguardando.length){m.innerHTML='<div class="vazio">Nada esperando por você agora.</div>';return;}
   m.innerHTML=aguardando.map(x=>'<div class="mesa-item"><span class="pill '+(x.tipo==='apr'?'p-apr':'p-info')+'">'+(x.tipo==='apr'?'APROVAR':'LER')+'</span><b>'+x.t+'</b><small>'+x.d+'</small></div>').join('');
 }
-function proxFluxo(){montar(fluxos[iFluxo%fluxos.length]);iFluxo++;}
-
-let espera=0;
 function tick(dt){
-  if(pausaGlobal){return;}
-  if(!fila.length){espera+=dt;if(espera>1500){espera=0;proxFluxo();}return;}
+  if(pausaGlobal||!fila.length)return;
   fila[0].ms-=dt;
   if(fila[0].ms<=0){const p=fila.shift();p.fn();}
 }
@@ -375,11 +353,26 @@ bPlay.onclick=()=>{rodando=!rodando;bPlay.textContent=rodando?'Pausar':'Continua
 const bVel=document.getElementById('bVel');const vels=[1,2,4];
 bVel.onclick=()=>{vel=vels[(vels.indexOf(vel)+1)%vels.length];bVel.textContent='Velocidade '+vel+'x';};
 const bPausa=document.getElementById('bPausa');
-bPausa.onclick=()=>{pausaGlobal=!pausaGlobal;bPausa.classList.toggle('on',pausaGlobal);bPausa.setAttribute('aria-pressed',pausaGlobal);log(pausaGlobal?'Arquivo PAUSA criado: ninguém executa':'PAUSA removida: fluxos voltaram',pausaGlobal?'esp':'ok');};
+bPausa.onclick=()=>{pausaGlobal=!pausaGlobal;bPausa.classList.toggle('on',pausaGlobal);bPausa.setAttribute('aria-pressed',pausaGlobal);log(pausaGlobal?'Tela pausada (para parar os agentes de verdade, crie 10-agentes/PAUSA no GitHub)':'Tela retomada',pausaGlobal?'esp':'ok');};
 if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){vel=4;}
 ficha(ag.atlas);
-log('Escritório aberto. Simulação dos fluxos reais em sequência.');
-proxFluxo();
+/* leitura do Sistema: eventos novos a cada 20 s; ao abrir, revê os de hoje */
+let ultimo=0;
+const sb=window.__sb;
+function selo(t,cor){const el=document.getElementById('selo');el.textContent=t;el.style.color=cor||'';}
+async function buscar(primeira){
+  const desde=new Date();desde.setHours(0,0,0,0);
+  let q=sb.from('trilha_agentes').select('*').order('id',{ascending:true}).limit(200);
+  q=primeira?q.gte('ocorrido_em',new Date(desde.getTime()-864e5).toISOString()):q.gt('id',ultimo);
+  const r=await q;
+  if(r.error){selo('Falta rodar o SQL 009 no Supabase para ligar o escritório','#ff5d73');return;}
+  (r.data||[]).forEach(e=>{ultimo=Math.max(ultimo,e.id);animar(e);});
+  const en=await sb.from('entregas_agentes').select('*').eq('situacao','aguardando').order('criado_em',{ascending:false}).limit(6);
+  if(!en.error){aguardando=(en.data||[]).map(x=>({t:x.titulo,d:x.resumo||x.decisao||'',tipo:x.decisao==='APROVAR'?'apr':'info'}));desenharMesa();}
+  selo('AO VIVO · '+ultimo+' eventos registrados · atualiza a cada 20 s','#35d39a');
+}
+document.getElementById('bRever').onclick=()=>{fila=[];ultimo=0;Object.values(ag).forEach(a=>{a.estado='livre';a.balao='';a.pasta=null;voltar(a.id)});log('Revendo o dia');buscar(true);};
+buscar(true);setInterval(()=>buscar(false),20000);
 };
 </script>
 
@@ -388,7 +381,7 @@ proxFluxo();
 <script src="../config.js"></script>
 <script>
 (function(){
-  var C=window.G3989, sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey);
+  var C=window.G3989, sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey); window.__sb=sb;
   var wrap=document.querySelector('.wrap'); wrap.hidden=true;
   sb.auth.getSession().then(function(r){
     var s=r.data.session, e=s&&String(s.user.email||'').toLowerCase();
