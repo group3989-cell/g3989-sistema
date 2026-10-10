@@ -83,7 +83,8 @@
       sb.from("checklist_cliente").select("cliente_id,feito"),
       sb.from("fechamentos").select("*"),
       sb.from("relatorios_meta").select("*"),
-      sb.from("tarefas").select("*").order("prioridade").order("grupo").order("ordem").order("criado_em")
+      /* feita há mais de 48 h some sozinha (reforço do SQL 013; a exclusão fica em tarefas_excluidas) */
+      sb.from("tarefas").delete().eq("feito", true).lt("feito_em", new Date(Date.now() - 48 * 3600 * 1000).toISOString()).then(function(){ return sb.from("tarefas").select("*").order("prioridade").order("grupo").order("ordem").order("criado_em"); })
     ]).then(function(r){
       est.tarefas = r[4].error ? null : (r[4].data || []);
       est.fech = r[2].error ? [] : (r[2].data || []);
