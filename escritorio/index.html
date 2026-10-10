@@ -73,6 +73,7 @@ aside{display:flex;flex-direction:column;gap:14px;min-width:0}
 textarea{width:100%;background:#070d1c;color:var(--fg);border:1px solid var(--linha);border-radius:8px;padding:10px;font:14px var(--f-disp)}
 .mAcoes{display:flex;flex-wrap:wrap;gap:8px}.bt{font:600 12px var(--f-disp);color:var(--fg);background:#13224a;border:1px solid var(--linha);border-radius:8px;padding:9px 12px;cursor:pointer}.bt.pri{background:var(--ciano);color:#00203f;border-color:var(--ciano)}
 .mOk{font:12px var(--f-mono);color:var(--ok)}
+.voz.on{background:var(--erro)!important;color:#fff!important;border-color:var(--erro)!important;animation:pulsa 1s infinite}@keyframes pulsa{50%{opacity:.7}}@media (prefers-reduced-motion:reduce){.voz.on{animation:none}}
 .mGrupo summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}.mGrupo summary::-webkit-details-marker{display:none}.mSec::before{content:'▸';color:var(--ciano)}.mGrupo[open]>.mSec::before{content:'▾'}.mQt{margin-left:auto;font:600 11px var(--f-mono);color:var(--fg2);background:#13224a;border-radius:99px;padding:1px 7px}.mGrupo summary:focus-visible{outline:2px solid var(--ciano);outline-offset:-2px}
 .mBotoes{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .mAviso{font:12px var(--f-mono);color:var(--ok);margin-top:6px;min-height:14px}
@@ -106,6 +107,7 @@ textarea{width:100%;background:#070d1c;color:var(--fg);border:1px solid var(--li
       <button id="bAtualizar" title="Busca agora o que os agentes registraram (A)">Atualizar</button>
       <button id="bEnviar" title="Avisa o Claude para ler suas respostas agora (E)">Enviar ao Claude</button>
       <button id="bAjuda" aria-haspopup="dialog" title="Teclas de atalho (?)">?</button>
+      <button id="bVoz" class="voz" aria-pressed="false" title="Comando de voz (V): fale 'abrir mesa', 'atualizar', 'enviar', 'próxima', 'opção 2', 'responder'">🎤 Voz</button>
       <button id="bPausa" aria-pressed="false">Botão PAUSA</button>
     </div>
   </header>
@@ -137,8 +139,8 @@ textarea{width:100%;background:#070d1c;color:var(--fg);border:1px solid var(--li
 </div>
 
 <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitulo"><div class="mBox">
-  <div class="mTopo"><div><div class="mig">Mesa do Thiago</div><h3 id="mTitulo"></h3><div class="meta2" id="mProg" aria-live="polite"></div><div class="pbar" aria-hidden="true"><i id="mBarra"></i></div><div class="mAviso" id="mAviso" role="status" aria-live="polite"></div></div><div class="mBotoes"><button class="bt" id="mAtualizar">Atualizar</button><button class="bt" id="mEnviar">Enviar ao Claude</button><button class="bt" id="mFechar" aria-label="Fechar a janela (Esc)">Fechar</button></div></div>
-  <div class="mAtalhos" aria-hidden="true">Atalhos: ← → ou J K navegar · 1 a 9 escolhe a opção · Ctrl+Enter responde · P deixa para depois · A atualiza · E envia ao Claude · Esc fecha</div>
+  <div class="mTopo"><div><div class="mig">Mesa do Thiago</div><h3 id="mTitulo"></h3><div class="meta2" id="mProg" aria-live="polite"></div><div class="pbar" aria-hidden="true"><i id="mBarra"></i></div><div class="mAviso" id="mAviso" role="status" aria-live="polite"></div></div><div class="mBotoes"><button class="bt voz" id="mVoz" aria-pressed="false" title="Falar a resposta ou um comando (V)">🎤 Falar</button><button class="bt" id="mAtualizar">Atualizar</button><button class="bt" id="mEnviar">Enviar ao Claude</button><button class="bt" id="mFechar" aria-label="Fechar a janela (Esc)">Fechar</button></div></div>
+  <div class="mAtalhos" aria-hidden="true">Atalhos: ← → ou J K navegar · 1 a 9 escolhe a opção · Ctrl+Enter responde · P deixa para depois · A atualiza · E envia ao Claude · V fala · Esc fecha</div>
   <div class="mGrade"><div class="mLista" id="mLista"></div><div class="mPergunta" id="mPergunta"></div></div>
 </div></div>
 <script>
@@ -465,6 +467,46 @@ async function enviarAoClaude(){const sb=window.__sb;const tit=painel.ent?painel
   const r=await sb.from('tarefas').insert({texto:'Claude: ler as respostas da mesa ('+tit+', '+resp+' respondidas) e agir',grupo:'Cérebro e integrações',prazo:hojeISO(),prioridade:1,responsavel:'Claude',criado_por:'Thiago'});
   if(r.error){painel.aviso='Não consegui avisar: '+r.error.message;log(painel.aviso,'dev');}else{painel.aviso='✓ Enviado ao Claude às '+hora()+'. Ele lê na próxima passada.';log('Você enviou as respostas ao Claude','ok');}
   if(!document.getElementById('modal').hidden){painel.semFoco=true;desenharPainel();}}
+
+/* Comando de voz: reconhecimento do próprio navegador (Chrome e Safari), nada sai para servidor nosso */
+const Rec=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null,ouvindo=false;
+function vozStatus(t,cls){painel.aviso=t;if(!document.getElementById('modal').hidden){painel.semFoco=true;document.getElementById('mAviso').textContent=t;}log(t,cls||'');}
+function vozBotoes(){document.querySelectorAll('#bVoz,#mVoz').forEach(b=>{b.setAttribute('aria-pressed',ouvindo?'true':'false');b.classList.toggle('on',ouvindo);b.textContent=ouvindo?'🎤 Ouvindo…':(b.id==='bVoz'?'🎤 Voz':'🎤 Falar');});}
+function normal(t){return t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[.,!?]/g,'').trim();}
+const NUM={'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,'seis':6,'sete':7,'oito':8,'nove':9};
+function comandoVoz(txt){
+  const t=normal(txt),aberto=!document.getElementById('modal').hidden;
+  const num=(m)=>{if(!m)return 0;return NUM[m]||parseInt(m,10)||0;};
+  let m;
+  if(/^(abrir|abre|abra) (a )?mesa$/.test(t)||t==='mesa'){if(aguardando.length)abrirEntrega(aguardando[0].id);else vozStatus('Nada na sua mesa agora');return true;}
+  if(/^atualiza(r)?$/.test(t)){atualizarTudo();return true;}
+  if(/^envia(r)?( ao| pro| para o)? claude$/.test(t)||t==='enviar'){enviarAoClaude();return true;}
+  if(/^fecha(r)?$/.test(t)){document.getElementById('modal').hidden=true;return true;}
+  if(/^rever( o dia)?$/.test(t)){document.getElementById('bRever').click();return true;}
+  if(!aberto)return false;
+  if(/^(proxima|proximo|avancar|pular|deixa(r)? para depois)$/.test(t)){document.getElementById('mPular').click();return true;}
+  if(/^(anterior|voltar|volta)$/.test(t)){document.getElementById('mAnt').click();return true;}
+  if((m=t.match(/^(opcao|escolhe(r)?|marca(r)?) (\w+)$/))){const n=num(m[4]);const ops=document.querySelectorAll('#mPergunta [data-op]');if(ops[n-1]){ops[n-1].click();vozStatus('Opção '+n+' marcada. Diga "responder" para salvar.');}return true;}
+  if(/^(responde(r)?|salva(r)?|confirma(r)?|pronto)$/.test(t)){const b=document.getElementById('mSalvar');if(b)b.click();return true;}
+  if(/^(limpa(r)?|apaga(r)?)$/.test(t)){const a=document.getElementById('mResp');if(a){a.value='';}return true;}
+  return false;
+}
+function alternarVoz(){
+  if(!Rec){vozStatus('Este navegador não tem reconhecimento de voz. No celular, use o microfone do teclado dentro do campo de resposta.','dev');return;}
+  if(ouvindo){rec.stop();return;}
+  rec=new Rec();rec.lang='pt-BR';rec.interimResults=true;rec.continuous=false;rec.maxAlternatives=1;
+  let parcial='';
+  rec.onstart=()=>{ouvindo=true;vozBotoes();vozStatus('Ouvindo… fale a resposta ou um comando (abrir mesa, atualizar, enviar, próxima, opção 2, responder).');};
+  rec.onresult=ev=>{let fim='',tmp='';for(let i=ev.resultIndex;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)fim+=r[0].transcript;else tmp+=r[0].transcript;}
+    const a=document.getElementById('mResp');
+    if(fim){if(!comandoVoz(fim)){if(a){a.value=(a.value?a.value+' ':'')+fim.trim();a.dispatchEvent(new Event('input'));vozStatus('Anotei: "'+fim.trim()+'". Diga "responder" ou aperte Ctrl+Enter.');}else{vozStatus('Não entendi o comando: "'+fim.trim()+'"','dev');}}}
+    else if(tmp&&a){parcial=tmp;document.getElementById('mAviso').textContent='Ouvindo: '+tmp;}};
+  rec.onerror=e=>{vozStatus(e.error==='not-allowed'?'O navegador bloqueou o microfone. Libere o acesso no cadeado da barra de endereço.':'Voz: '+e.error,'dev');};
+  rec.onend=()=>{ouvindo=false;vozBotoes();};
+  try{rec.start();}catch(e){vozStatus('Não consegui iniciar o microfone: '+e.message,'dev');}
+}
+document.getElementById('bVoz').onclick=alternarVoz;document.getElementById('mVoz').onclick=alternarVoz;
 document.getElementById('mAtualizar').onclick=atualizarTudo;document.getElementById('bAtualizar').onclick=atualizarTudo;
 document.getElementById('mEnviar').onclick=enviarAoClaude;document.getElementById('bEnviar').onclick=enviarAoClaude;
 document.getElementById('bAjuda').onclick=()=>{log('Atalhos: M abre a mesa · A atualiza · E envia ao Claude · R revê o dia · Espaço pausa a tela · na janela: ← → ou J K navegam, 1 a 9 escolhem a opção, Ctrl+Enter responde, P deixa para depois, Esc fecha');};
@@ -481,6 +523,7 @@ document.addEventListener('keydown',e=>{
     if(e.key==='p'||e.key==='P'){const b=document.getElementById('mPular');if(b)b.click();return;}
     if(e.key==='a'||e.key==='A'){atualizarTudo();return;}
     if(e.key==='e'||e.key==='E'){enviarAoClaude();return;}
+    if(e.key==='v'||e.key==='V'){alternarVoz();return;}
     if(/^[1-9]$/.test(e.key)){const ops=document.querySelectorAll('#mPergunta [data-op]');const b=ops[+e.key-1];if(b){b.click();}return;}
   }else{
     if(digitando)return;
@@ -488,6 +531,7 @@ document.addEventListener('keydown',e=>{
     else if(e.key==='a'||e.key==='A'){atualizarTudo();}
     else if(e.key==='e'||e.key==='E'){enviarAoClaude();}
     else if(e.key==='r'||e.key==='R'){document.getElementById('bRever').click();}
+    else if(e.key==='v'||e.key==='V'){alternarVoz();}
     else if(e.key===' '){e.preventDefault();document.getElementById('bPlay').click();}
     else if(e.key==='?'){document.getElementById('bAjuda').click();}
   }
