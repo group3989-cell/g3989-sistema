@@ -113,7 +113,7 @@ textarea{width:100%;background:#070d1c;color:var(--fg);border:1px solid var(--li
   </header>
 
   <div class="grade">
-    <div class="planta"><canvas id="cv" width="1200" height="760" aria-label="Planta do escritório com os agentes"></canvas></div>
+    <div class="planta"><canvas id="cv" width="1200" height="400" aria-label="Planta do escritório com os agentes"></canvas></div>
     <aside>
       <div class="caixa">
         <h2>Mesa do Thiago</h2>
@@ -146,50 +146,30 @@ textarea{width:100%;background:#070d1c;color:var(--fg);border:1px solid var(--li
 <script>
 window.iniciarEscritorio=function(){
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
-const W=1200,H=760;
+const W=1200,H=400;
 const salas=[
  {id:'thiago',nome:'Mesa do Thiago',cor:'#e8eefc',x:30,y:30,w:270,h:160},
- {id:'diretoria',nome:'Diretoria',cor:'#2f6fd6',x:320,y:30,w:280,h:160},
- {id:'qualidade',nome:'Qualidade',cor:'#35d39a',x:620,y:30,w:260,h:160},
- {id:'auditoria',nome:'Auditoria',cor:'#a77bff',x:900,y:30,w:270,h:160},
- {id:'dados',nome:'Dados',cor:'#8a98b8',x:30,y:215,w:270,h:160},
- {id:'trafego',nome:'Tráfego',cor:'#13bbf1',x:320,y:215,w:280,h:160},
- {id:'criativo',nome:'Criativo',cor:'#ff8a3d',x:620,y:215,w:260,h:160},
- {id:'mercado',nome:'Mercado e Planejamento',cor:'#ffd147',x:900,y:215,w:270,h:160},
- {id:'operacao',nome:'Operação',cor:'#7cc8ff',x:30,y:400,w:270,h:160},
- {id:'admfin',nome:'Administrativo e Financeiro',cor:'#2fae7a',x:320,y:400,w:560,h:160},
- {id:'comercial',nome:'Comercial',cor:'#ff5d73',x:900,y:400,w:270,h:160},
- {id:'atendimento',nome:'Atendimento',cor:'#ff7fc8',x:30,y:585,w:270,h:150},
- {id:'arquivo',nome:'Arquivo',cor:'#b9875a',x:320,y:585,w:850,h:150}
+ {id:'diretoria',nome:'Diretoria',cor:'#2f6fd6',x:320,y:30,w:200,h:160},
+ {id:'qualidade',nome:'Qualidade e Auditoria',cor:'#a77bff',x:540,y:30,w:330,h:160},
+ {id:'dados',nome:'Dados',cor:'#8a98b8',x:890,y:30,w:280,h:160},
+ {id:'operacao',nome:'Operação: tráfego, criativo e planos',cor:'#13bbf1',x:30,y:215,w:560,h:160},
+ {id:'admfin',nome:'Administrativo e Financeiro',cor:'#2fae7a',x:610,y:215,w:260,h:160},
+ {id:'comercial',nome:'Comercial',cor:'#ff5d73',x:890,y:215,w:280,h:160}
 ];
 const S=Object.fromEntries(salas.map(s=>[s.id,s]));
 const A=[
- ['atlas','Atlas','diretoria','Diretor: abre o fluxo, chama as camadas, controla as voltas','Sonnet'],
- ['clara','Clara','diretoria','Consolidadora: escreve a entrega final para você','Sonnet'],
- ['tome','Tomé','qualidade','Verificador: refaz as contas na fonte','Sonnet'],
- ['sofia','Sofia','qualidade','Revisora: analisa a verificação do Tomé','Sonnet'],
- ['themis','Themis','auditoria','Auditora de conformidade (leis, plataformas, regra do cliente)','Opus'],
- ['sentinela','Sentinela','auditoria','Auditora de segurança (segredo, dado pessoal, permissão)','Haiku'],
- ['hermes','Hermes','dados','Robôs de coleta no GitHub Actions (Meta, Instagram, GA4, Heaven, Google Ads)','Sem IA'],
- ['argos','Argos','dados','Vigia: saldo, cobrança, link quebrado, conta parada','Haiku'],
- ['orion','Orion','trafego','Analista de tráfego: diário, semanal, fechamento','Sonnet'],
- ['leo','Leo','trafego','Gestor de campanhas: único que mexe em conta, só com sua aprovação','Sonnet'],
- ['lia','Lia','criativo','Copywriter na voz de cada cliente','Sonnet'],
- ['lumi','Lumi','criativo','Roteirista de vídeo com o modelo aprovado','Sonnet'],
- ['radar','Radar','mercado','Pesquisa da Biblioteca de Anúncios, todo mês','Sonnet'],
- ['vetor','Vetor','mercado','Planos de data de trás para frente (Black Friday)','Opus'],
- ['otto','Otto','operacao','Tarefas do Sistema, agenda e lembretes','Haiku'],
- ['juno','Juno','admfin','Contratos: vigência, teste, renovação, assinatura','Haiku'],
- ['cora','Cora','admfin','Contas a receber: fee, comissão, NF, cobrança','Sonnet'],
- ['tito','Tito','admfin','Caixa da empresa (só PJ) e previsão de 60 dias','Sonnet'],
- ['fausto','Fausto','admfin','Fechamento do cliente e cobrança das contas Meta','Sonnet'],
- ['caio','Caio','comercial','Prospecção: funil comercial da própria G3989','Sonnet'],
- ['vitoria','Vitória','comercial','Propostas no modelo Ganha a Ganha','Opus'],
- ['bento','Bento','comercial','Sucesso do cliente: saúde da carteira, renovação','Sonnet'],
- ['iris','Iris','atendimento','Prompts das IAs de atendimento e réguas','Sonnet'],
- ['mnemo','Mnemo','arquivo','Bibliotecário do cérebro: índices e governança','Haiku']
+ ['atlas','Atlas','diretoria','Diretor: abre o fluxo, consolida a entrega, tarefas e cérebro (absorveu Clara, Otto e Mnemo)','Sonnet'],
+ ['tome','Tomé','qualidade','Verificador: refaz na fonte e revisa a própria verificação (absorveu Sofia)','Sonnet'],
+ ['themis','Themis','qualidade','Auditora: conformidade e, em seguida, segurança (absorveu Sentinela)','Opus'],
+ ['argos','Argos','dados','Vigia e coletores: saldo, cobrança, link, conta parada (absorveu Hermes)','Haiku'],
+ ['orion','Orion','operacao','Tráfego: diário, semanal, fechamento; único que mexe em conta, só com APROVAR (absorveu Leo)','Sonnet'],
+ ['lia','Lia','operacao','Copy na voz do cliente, mensagens e IAs de atendimento (absorveu Iris)','Sonnet'],
+ ['lumi','Lumi','operacao','Roteirista e editora de vídeo com o modelo aprovado','Sonnet'],
+ ['vetor','Vetor','operacao','Planos de data e inteligência de mercado (absorveu Radar)','Opus'],
+ ['cora','Cora','admfin','Contratos, cobrança, NF e caixa PJ (absorveu Juno, Tito e Fausto)','Sonnet'],
+ ['vitoria','Vitória','comercial','Comercial: prospecção, propostas e sucesso do cliente (absorveu Caio e Bento)','Opus']
 ];
-const ARQ={hermes:'coletores/ (robôs)'};
+const ARQ={};
 const ag={};
 const porSala={};
 A.forEach(([id,nome,sala,papel,modelo])=>{(porSala[sala]=porSala[sala]||[]).push(id);ag[id]={id,nome,sala,papel,modelo,estado:'livre',balao:'',x:0,y:0,mx:0,my:0,tx:0,ty:0,pasta:null}});
@@ -207,7 +187,7 @@ function log(html,cls,quando){const d=document.createElement('div');d.innerHTML=
 function ir(id,x,y){const a=ag[id];a.tx=x;a.ty=y;}
 function voltar(id){const a=ag[id];a.tx=a.mx;a.ty=a.my;}
 function passo(fn,ms){fila.push({fn,ms});}
-const ALIAS={claude:'atlas','tomé':'tome','vitória':'vitoria'};
+const ALIAS={claude:'atlas','tomé':'tome','vitória':'vitoria',clara:'atlas',otto:'atlas',mnemo:'atlas',sofia:'tome',sentinela:'themis',hermes:'argos',leo:'orion',iris:'lia',radar:'vetor',juno:'cora',tito:'cora',fausto:'cora',caio:'vitoria',bento:'vitoria'};
 function idDe(n){n=String(n||'').toLowerCase().trim();n=ALIAS[n]||n;return ag[n]?n:null;}
 const comDevolucao=new Set();
 function curto(t){t=String(t||'');return t.length>60?t.slice(0,58)+'…':t;}
