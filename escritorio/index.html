@@ -194,7 +194,9 @@ const ag={};
 const porSala={};
 A.forEach(([id,nome,sala,papel,modelo])=>{(porSala[sala]=porSala[sala]||[]).push(id);ag[id]={id,nome,sala,papel,modelo,estado:'livre',balao:'',x:0,y:0,mx:0,my:0,tx:0,ty:0,pasta:null}});
 Object.entries(porSala).forEach(([sid,ids])=>{const s=S[sid];const n=ids.length;ids.forEach((id,i)=>{const col=(i+1)/(n+1);const a=ag[id];a.mx=s.x+s.w*col;a.my=s.y+s.h*0.62;a.x=a.tx=a.mx;a.y=a.ty=a.my;});});
-const mesaThiago={x:S.thiago.x+S.thiago.w/2,y:S.thiago.y+S.thiago.h*0.62};
+const mesaThiago={x:S.thiago.x+S.thiago.w/2-20,y:S.thiago.y+S.thiago.h*0.62};
+const mesaWillian={x:S.thiago.x+S.thiago.w-38,y:S.thiago.y+S.thiago.h*0.62};
+let tarefasWillian=0, acaoWillian=null;
 const COR={livre:'#9fb0d6',trabalhando:'#13bbf1',levando:'#13bbf1',aprovado:'#35d39a',devolvido:'#ff5d73',esperando:'#ffb547',pausado:'#6b7ca6'};
 
 /* Modo real: anima os eventos gravados pelos agentes na tabela trilha_agentes do Sistema */
@@ -218,6 +220,10 @@ function animar(e){
     passo(()=>{a.estado='levando';a.pasta=e.fluxo;ir(id,mesaThiago.x+40,mesaThiago.y-10);},1800);
     passo(()=>{const alvo={x:a.x,y:a.y};if(comDevolucao.has(e.fluxo)){acaoThiago={tipo:'chicote',t0:tempo,alvo};a.tremer=true;a.balao='Ai! Teve erro no caminho';}else{acaoThiago={tipo:'abraco',t0:tempo,alvo};a.balao='Certo de primeira!';}},2600);
     passo(()=>{acaoThiago=null;a.tremer=false;a.pasta=null;a.estado='livre';a.balao='';voltar(id);},1400);
+  }else if(para==='willian'){
+    passo(()=>{a.estado='levando';a.pasta=e.fluxo;ir(id,mesaWillian.x-34,mesaWillian.y-10);},1800);
+    passo(()=>{acaoWillian={t0:tempo};a.pasta=null;a.estado='aprovado';a.balao='Entregue ao Willian';},1400);
+    passo(()=>{acaoWillian=null;a.estado='livre';a.balao='';voltar(id);},800);
   }else if(idDe(para)&&idDe(para)!==id){
     const p=idDe(para);
     passo(()=>{a.estado='levando';a.pasta=e.fluxo;ir(id,ag[p].mx,ag[p].my-28);},1800);
@@ -344,6 +350,20 @@ function desenharThiago(){
   cabeca(x,y-42,v,0,false);
   ctx.font='600 11px Sora, system-ui, sans-serif';ctx.fillStyle='#e8eefc';ctx.textAlign='center';ctx.fillText('Thiago',bx,by+38);ctx.textAlign='left';
 }
+function desenharWillian(){
+  const v={pele:'#c68642',cab:'#151515',estilo:2,oculos:false,barba:true,olho:'#151515'};
+  const x=mesaWillian.x,y=mesaWillian.y;
+  rr(x-22,y+2,44,18,4);ctx.fillStyle='#5b4632';ctx.fill();
+  for(let i=0;i<Math.min(tarefasWillian,4);i++){rr(x+4+i*5,y-4-i*4,18,10,2);ctx.fillStyle='#7cc8ff';ctx.fill();}
+  rr(x-15,y-28,30,30,9);ctx.fillStyle='#0f3d6e';ctx.fill();ctx.strokeStyle='#7cc8ff';ctx.lineWidth=2;ctx.stroke();
+  ctx.lineCap='round';ctx.strokeStyle='#0f3d6e';ctx.lineWidth=7;
+  const dig=tarefasWillian>0;const o1=dig?Math.sin(tempo/60)*2.5:0,o2=dig?Math.sin(tempo/60+2)*2.5:0;
+  ctx.beginPath();ctx.moveTo(x-12,y-20);ctx.lineTo(x-8,y-4+o1);ctx.stroke();ctx.beginPath();ctx.moveTo(x+12,y-20);ctx.lineTo(x+4,y-4+o2);ctx.stroke();
+  if(acaoWillian){ctx.beginPath();ctx.moveTo(x-12,y-20);ctx.lineTo(x-30,y-30);ctx.stroke();}
+  cabeca(x,y-42,v,0,false);
+  ctx.font='600 11px Sora, system-ui, sans-serif';ctx.fillStyle='#e8eefc';ctx.textAlign='center';ctx.fillText('Willian',x,y+38);
+  ctx.fillStyle='#9fb0d6';ctx.font='10px "IBM Plex Mono", monospace';ctx.fillText(tarefasWillian+(tarefasWillian===1?' tarefa':' tarefas'),x,y+50);ctx.textAlign='left';
+}
 function coracao(x,y,s,alfa){ctx.save();ctx.globalAlpha=Math.max(0,alfa);ctx.fillStyle='#ff5d8a';ctx.beginPath();ctx.moveTo(x,y+s*.9);ctx.bezierCurveTo(x-s*1.6,y-s*.2,x-s*.6,y-s*1.4,x,y-s*.4);ctx.bezierCurveTo(x+s*.6,y-s*1.4,x+s*1.6,y-s*.2,x,y+s*.9);ctx.fill();ctx.restore();}
 function ponto(x,y,c){ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fillStyle=c;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#0b1430';ctx.stroke();}
 function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
@@ -366,6 +386,7 @@ function desenhar(){
   // cadeira, boneco e mesa de cada agente (a mesa fica na frente de quem está sentado)
   Object.values(ag).forEach(a=>{const sentado=Math.hypot(a.x-a.mx,a.y-a.my)<2;cadeira(a);if(sentado)boneco(a,true);mesa(a);});
   desenharThiago();
+  desenharWillian();
   Object.values(ag).forEach(a=>{if(Math.hypot(a.x-a.mx,a.y-a.my)>=2)boneco(a,false);});
   if(pausaGlobal){ctx.fillStyle='rgba(7,13,28,.55)';ctx.fillRect(0,0,W,H);}
   Object.values(ag).forEach(a=>{
@@ -557,6 +578,8 @@ async function buscar(primeira){
     aguardando=(en.data||[]).map(x=>{const meus=(it.data||[]).filter(y=>y.entrega_id===x.id);const agora=meus.filter(y=>!y.prazo||y.prazo<=lim).length;return {id:x.id,t:x.titulo,d:(agora?agora+' para decidir até '+fmtData(lim):'nada vence esta semana')+(meus.length-agora>0?' · '+(meus.length-agora)+' agendadas':''),tipo:agora?'apr':'info',agora};});
     desenharMesa();
   }
+  const tw=await sb.from('tarefas').select('id',{count:'exact',head:true}).eq('responsavel','Willian').eq('feito',false);
+  if(!tw.error)tarefasWillian=tw.count||0;
   selo('AO VIVO · '+ultimo+' eventos registrados · atualiza a cada 20 s','#35d39a');
 }
 document.getElementById('bRever').onclick=()=>{fila=[];ultimo=0;Object.values(ag).forEach(a=>{a.estado='livre';a.balao='';a.pasta=null;voltar(a.id)});log('Revendo o dia');buscar(true);};
