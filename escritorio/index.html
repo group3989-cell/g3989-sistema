@@ -73,6 +73,7 @@ aside{display:flex;flex-direction:column;gap:14px;min-width:0}
 textarea{width:100%;background:#070d1c;color:var(--fg);border:1px solid var(--linha);border-radius:8px;padding:10px;font:14px var(--f-disp)}
 .mAcoes{display:flex;flex-wrap:wrap;gap:8px}.bt{font:600 12px var(--f-disp);color:var(--fg);background:#13224a;border:1px solid var(--linha);border-radius:8px;padding:9px 12px;cursor:pointer}.bt.pri{background:var(--ciano);color:#00203f;border-color:var(--ciano)}
 .mOk{font:12px var(--f-mono);color:var(--ok)}
+.mGrupo summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}.mGrupo summary::-webkit-details-marker{display:none}.mSec::before{content:'▸';color:var(--ciano)}.mGrupo[open]>.mSec::before{content:'▾'}.mQt{margin-left:auto;font:600 11px var(--f-mono);color:var(--fg2);background:#13224a;border-radius:99px;padding:1px 7px}.mGrupo summary:focus-visible{outline:2px solid var(--ciano);outline-offset:-2px}
 .mBotoes{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .mAviso{font:12px var(--f-mono);color:var(--ok);margin-top:6px;min-height:14px}
 .mAtalhos{font:11px var(--f-mono);color:var(--fg3);padding:6px 16px;border-bottom:1px solid var(--linha)}
@@ -412,13 +413,17 @@ function desenharPainel(){
   const P=painel,n=P.itens.length,resp=P.itens.filter(x=>x.situacao==='respondido').length;
   document.getElementById('mTitulo').textContent=P.ent.titulo;
   document.getElementById('mAviso').textContent=P.aviso||'';
-  document.getElementById('mProg').textContent=n?resp+' de '+n+' respondidas':'sem perguntas';
+  const abertas=P.itens.filter(x=>x.situacao!=='respondido'&&(!x.prazo||x.prazo<=limiteSemana())).length;document.getElementById('mProg').textContent=n?(abertas+' para decidir esta semana · '+resp+' de '+n+' respondidas'):'sem perguntas';
   document.getElementById('mBarra').style.width=(n?resp/n*100:0)+'%';
   const lista=document.getElementById('mLista');
-  const lim=limiteSemana(),hoje=hojeISO();let sec='';
-  lista.innerHTML=P.itens.map((x,k)=>{const grupo=(!x.prazo||x.prazo<=lim)?'Para decidir até '+fmtData(lim):'Agendadas (aparecem na semana certa)';let cab='';if(grupo!==sec){sec=grupo;cab='<div class="mSec">'+escH(grupo)+'</div>';}
-    const atras=x.prazo&&x.prazo<hoje&&x.situacao!=='respondido';
-    return cab+'<button class="mi'+(k===P.i?' sel':'')+(x.situacao==='respondido'?' ok':'')+(atras?' atr':'')+'" data-k="'+k+'"'+(k===P.i?' aria-current="true"':'')+' aria-label="'+(k+1)+' de '+n+(x.situacao==='respondido'?', respondida':'')+'"><span class="mPz">'+escH(fmtData(x.prazo))+'</span>'+escH((x.cliente?x.cliente+': ':'')+x.pergunta).slice(0,70)+'</button>';}).join('');
+  const lim=limiteSemana(),hoje=hojeISO();
+  const grupos=[['agora','Para decidir até '+fmtData(lim),x=>x.situacao!=='respondido'&&(!x.prazo||x.prazo<=lim)],['depois','Agendadas, aparecem na semana certa',x=>x.situacao!=='respondido'&&x.prazo&&x.prazo>lim],['feitas','Respondidas',x=>x.situacao==='respondido']];
+  if(!P.abertos)P.abertos={agora:true,depois:false,feitas:false};
+  const atual=P.itens[P.i];
+  lista.innerHTML=grupos.map(([id,rot,f])=>{const itens=P.itens.map((x,k)=>[x,k]).filter(([x])=>f(x));if(!itens.length)return '';
+    const aberto=P.abertos[id]||(atual&&f(atual));
+    return '<details class="mGrupo"'+(aberto?' open':'')+' data-g="'+id+'"><summary class="mSec">'+escH(rot)+' <span class="mQt">'+itens.length+'</span></summary>'+itens.map(([x,k])=>{const atras=x.prazo&&x.prazo<hoje&&x.situacao!=='respondido';return '<button class="mi'+(k===P.i?' sel':'')+(x.situacao==='respondido'?' ok':'')+(atras?' atr':'')+'" data-k="'+k+'"'+(k===P.i?' aria-current="true"':'')+' aria-label="'+(k+1)+' de '+n+(x.situacao==='respondido'?', respondida':'')+'"><span class="mPz">'+escH(fmtData(x.prazo))+'</span>'+escH((x.cliente?x.cliente+': ':'')+x.pergunta).slice(0,70)+'</button>';}).join('')+'</details>';}).join('');
+  lista.querySelectorAll('details').forEach(d=>d.addEventListener('toggle',()=>{P.abertos[d.dataset.g]=d.open;}));
   lista.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{P.i=+b.dataset.k;P.aviso='';desenharPainel();});
   const selEl=lista.querySelector('.mi.sel');if(selEl)selEl.scrollIntoView({block:'nearest'});
   const x=P.itens[P.i],q=document.getElementById('mPergunta');
