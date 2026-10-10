@@ -73,6 +73,9 @@ aside{display:flex;flex-direction:column;gap:14px;min-width:0}
 textarea{width:100%;background:#070d1c;color:var(--fg);border:1px solid var(--linha);border-radius:8px;padding:10px;font:14px var(--f-disp)}
 .mAcoes{display:flex;flex-wrap:wrap;gap:8px}.bt{font:600 12px var(--f-disp);color:var(--fg);background:#13224a;border:1px solid var(--linha);border-radius:8px;padding:9px 12px;cursor:pointer}.bt.pri{background:var(--ciano);color:#00203f;border-color:var(--ciano)}
 .mOk{font:12px var(--f-mono);color:var(--ok)}
+.mSec{font:600 11px var(--f-disp);text-transform:uppercase;letter-spacing:.08em;color:var(--fg3);padding:10px 12px 4px;background:#0b1430;position:sticky;top:0}
+.mPz{display:inline-block;min-width:38px;font:500 11px var(--f-mono);color:var(--alerta);margin-right:6px}.mi.atr .mPz{color:var(--erro)}.mAtr{color:var(--erro)}
+.mBloco{font-size:13px;line-height:1.5;color:var(--fg2);border-left:3px solid var(--linha);padding:4px 10px}.mBloco b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg3);margin-bottom:2px}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 .porta{min-height:100%;display:grid;place-items:center;padding:16px}.porta .caixa{max-width:380px;text-align:center}.lnk{display:inline-block;margin-top:10px;color:var(--ciano)}
 [hidden]{display:none!important}
@@ -380,15 +383,18 @@ bPausa.onclick=()=>{pausaGlobal=!pausaGlobal;bPausa.classList.toggle('on',pausaG
 if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){vel=4;}
 
 /* Mesa do Thiago: abre uma entrega e responde as perguntas uma a uma (grava em entregas_itens) */
+function hojeISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
+function limiteSemana(){const d=new Date();d.setDate(d.getDate()+7);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
+function fmtData(iso){if(!iso)return 'sem prazo';const [a,m,d]=iso.split('-');return d+'/'+m;}
 function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 const painel={ent:null,itens:[],i:0};
 async function abrirEntrega(id){
   const sb=window.__sb;
   const e=await sb.from('entregas_agentes').select('*').eq('id',id).single();
-  const it=await sb.from('entregas_itens').select('*').eq('entrega_id',id).order('ordem');
+  const it=await sb.from('entregas_itens').select('*').eq('entrega_id',id).order('prazo',{ascending:true,nullsFirst:false}).order('ordem');
   if(e.error||it.error){log('Não consegui abrir a entrega: '+escH((e.error||it.error).message),'dev');return;}
   painel.ent=e.data;painel.itens=it.data||[];
-  const prim=painel.itens.findIndex(x=>x.situacao==='aguardando');painel.i=prim<0?0:prim;
+  const lim=limiteSemana();let prim=painel.itens.findIndex(x=>x.situacao==='aguardando'&&(!x.prazo||x.prazo<=lim));if(prim<0)prim=painel.itens.findIndex(x=>x.situacao==='aguardando');painel.i=prim<0?0:prim;
   document.getElementById('modal').hidden=false;desenharPainel();
 }
 function desenharPainel(){
@@ -397,12 +403,18 @@ function desenharPainel(){
   document.getElementById('mProg').textContent=n?resp+' de '+n+' respondidas':'sem perguntas';
   document.getElementById('mBarra').style.width=(n?resp/n*100:0)+'%';
   const lista=document.getElementById('mLista');
-  lista.innerHTML=P.itens.map((x,k)=>'<button class="mi'+(k===P.i?' sel':'')+(x.situacao==='respondido'?' ok':'')+'" data-k="'+k+'">'+(k+1)+'. '+escH(((x.cliente?x.cliente+': ':'')+x.pergunta).slice(0,64))+'</button>').join('');
+  const lim=limiteSemana(),hoje=hojeISO();let sec='';
+  lista.innerHTML=P.itens.map((x,k)=>{const grupo=(!x.prazo||x.prazo<=lim)?'Para decidir até '+fmtData(lim):'Agendadas (aparecem na semana certa)';let cab='';if(grupo!==sec){sec=grupo;cab='<div class="mSec">'+escH(grupo)+'</div>';}
+    const atras=x.prazo&&x.prazo<hoje&&x.situacao!=='respondido';
+    return cab+'<button class="mi'+(k===P.i?' sel':'')+(x.situacao==='respondido'?' ok':'')+(atras?' atr':'')+'" data-k="'+k+'"><span class="mPz">'+escH(fmtData(x.prazo))+'</span>'+escH((x.cliente?x.cliente+': ':'')+x.pergunta).slice(0,70)+'</button>';}).join('');
   lista.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{P.i=+b.dataset.k;desenharPainel();});
   const x=P.itens[P.i],q=document.getElementById('mPergunta');
   if(!x){q.innerHTML='<div class="vazio">'+escH(P.ent.resumo||'Sem perguntas nesta entrega.')+'</div><div class="mAcoes"><button class="bt pri" id="mLido">Marcar como lida</button></div>';document.getElementById('mLido').onclick=()=>concluir('lido');return;}
   const ops=Array.isArray(x.opcoes)?x.opcoes:[];
-  q.innerHTML='<div class="mCli">'+escH(x.cliente||'Geral')+' · pergunta '+(P.i+1)+' de '+n+'</div><div class="mTxt">'+escH(x.pergunta)+'</div>'+
+  const atrasada=x.prazo&&x.prazo<hojeISO()&&x.situacao!=='respondido';
+  q.innerHTML='<div class="mCli">'+escH(x.cliente||'Geral')+' · decidir até '+escH(fmtData(x.prazo))+(atrasada?' · <span class="mAtr">atrasada</span>':'')+' · '+(P.i+1)+' de '+n+'</div><div class="mTxt">'+escH(x.pergunta)+'</div>'+
+    (x.porque?'<div class="mBloco"><b>Por que agora</b>'+escH(x.porque)+'</div>':'')+
+    (x.depois?'<div class="mBloco"><b>Depois da sua resposta</b>'+escH(x.depois)+'</div>':'')+
     '<div class="mOps">'+ops.map(o=>'<button class="bt op" data-op="'+escH(o)+'">'+escH(o)+'</button>').join('')+'</div>'+
     '<textarea id="mResp" rows="3" placeholder="Sua resposta, pode ser curta">'+escH(x.resposta||'')+'</textarea>'+
     '<div class="mAcoes"><button class="bt pri" id="mSalvar">Responder e ir para a próxima</button><button class="bt" id="mPular">Deixar para depois</button><button class="bt" id="mAnt">Anterior</button></div>'+
@@ -419,9 +431,9 @@ async function salvarItem(x,resp){
   if(r.error){log('Não salvou: '+escH(r.error.message),'dev');return;}
   x.resposta=resp;x.situacao='respondido';x.respondido_em=agora;
   log('Você respondeu a pergunta '+(painel.i+1)+' de '+escH(painel.ent.titulo),'ok');
-  let prox=painel.itens.findIndex((y,k)=>k>painel.i&&y.situacao==='aguardando');
-  if(prox<0)prox=painel.itens.findIndex(y=>y.situacao==='aguardando');
-  if(prox>=0){painel.i=prox;desenharPainel();}else{await concluir('aprovado');}
+  const lim=limiteSemana();let prox=painel.itens.findIndex((y,k)=>k>painel.i&&y.situacao==='aguardando'&&(!y.prazo||y.prazo<=lim));
+  if(prox<0)prox=painel.itens.findIndex(y=>y.situacao==='aguardando'&&(!y.prazo||y.prazo<=lim));
+  if(prox>=0){painel.i=prox;desenharPainel();}else{const resta=painel.itens.filter(y=>y.situacao==='aguardando').length;if(resta){log('As decisões desta semana estão respondidas. '+resta+' ficam agendadas para a semana certa.','ok');document.getElementById('modal').hidden=true;await buscar(false);}else{await concluir('aprovado');}}
 }
 async function concluir(sit){
   const sb=window.__sb;await sb.from('entregas_agentes').update({situacao:sit}).eq('id',painel.ent.id);
@@ -443,7 +455,13 @@ async function buscar(primeira){
   if(r.error){selo('Falta rodar o SQL 009 no Supabase para ligar o escritório','#ff5d73');return;}
   (r.data||[]).forEach(e=>{ultimo=Math.max(ultimo,e.id);animar(e);});
   const en=await sb.from('entregas_agentes').select('*').eq('situacao','aguardando').order('criado_em',{ascending:false}).limit(6);
-  if(!en.error){aguardando=(en.data||[]).map(x=>({id:x.id,t:x.titulo,d:x.resumo||x.decisao||'',tipo:x.decisao==='APROVAR'?'apr':'info'}));desenharMesa();}
+  if(!en.error){
+    const ids=(en.data||[]).map(x=>x.id);
+    const it=ids.length?await sb.from('entregas_itens').select('entrega_id,prazo,situacao').in('entrega_id',ids).eq('situacao','aguardando'):{data:[]};
+    const lim=limiteSemana();
+    aguardando=(en.data||[]).map(x=>{const meus=(it.data||[]).filter(y=>y.entrega_id===x.id);const agora=meus.filter(y=>!y.prazo||y.prazo<=lim).length;return {id:x.id,t:x.titulo,d:(agora?agora+' para decidir até '+fmtData(lim):'nada vence esta semana')+(meus.length-agora>0?' · '+(meus.length-agora)+' agendadas':''),tipo:agora?'apr':'info',agora};});
+    desenharMesa();
+  }
   selo('AO VIVO · '+ultimo+' eventos registrados · atualiza a cada 20 s','#35d39a');
 }
 document.getElementById('bRever').onclick=()=>{fila=[];ultimo=0;Object.values(ag).forEach(a=>{a.estado='livre';a.balao='';a.pasta=null;voltar(a.id)});log('Revendo o dia');buscar(true);};
